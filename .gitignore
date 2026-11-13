@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Chỉ commit mẫu cấu hình, không commit credentials của môi trường.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+signing_keys.json
+supabase/.temp/
+supabase/.branches/

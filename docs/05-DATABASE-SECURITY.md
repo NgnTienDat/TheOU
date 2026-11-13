@@ -1,0 +1,164 @@
+# 05 — Thiết kế Database, danh tính ẩn danh và bảo mật
+
+**Cảnh báo:** Đây là **đặc tả thiết kế**, không phải migration đã chạy. Codex phải viết migration + test phủ cả quyền được phép và quyền bị từ chối. RLS và grants là cổng an toàn; các Edge Functions dùng secret/admin vẫn phải tự kiểm tra quyền vì có thể bypass RLS.
+
+## 1. ERD tối giản
+
+```mermaid
+erDiagram
+  AUTH_USERS ||--|| PROFILES : "có"
+  AUTH_USERS ||--o{ POSTS : "viết"
+  AUTH_USERS ||--o{ COMMENTS : "bình luận"
+  AUTH_USERS ||--o{ POST_VOTES : "vote"
+  POSTS ||--o{ COMMENTS : "có"
+  POSTS ||--o{ POST_VOTES : "nhận"
+  POSTS ||--o{ POST_IMAGES : "gắn"
+  AUTH_USERS ||--o{ REPORTS : "gửi"
+  AUTH_USERS ||--o{ MODERATION_ACTIONS : "xử lý"
+  AUTH_USERS ||--o{ USER_ROLES : "quyền"
+```
+
+`auth.users` do Supabase quản lý, **không sửa bảng này để thêm cột nghiệp vụ**. FK ứng dụng đến `auth.users(id)` phải có chính sách xóa phù hợp; ưu tiên soft-delete nội dung.
+
+## 2. Bảng và dữ liệu
+
+### `profiles`
+
+| Cột | Loại | Ràng buộc |
+|---|---|---|
+| `id` | uuid | PK, FK `auth.users.id` |
+| `nickname` | varchar(30) | NOT NULL, 3–30 ký tự, không dùng email mặc định |
+| `status` | text/enum | `ACTIVE`, `BANNED` |
+| `created_at`, `updated_at` | timestamptz | UTC, NOT NULL |
+
+Dữ liệu nhạy cảm email vẫn ở `auth.users`, không nhân bản nếu không có nhu cầu. Chỉ `getMe` được trả email cho **chính chủ**, feed không bao giờ trả profile ID của tác giả khác.
+
+### `user_roles`
+
+`(user_id uuid FK, role enum('ADMIN'), created_at timestamptz, granted_by uuid nullable)`. PK `(user_id,role)`. Người dùng thường mặc định không có record admin. **Không** nhận role từ `user_metadata` hoặc payload client.
+
+### `posts`
+
+| Cột | Loại | Quy tắc |
+|---|---|---|
+| `id` | uuid | PK, UUID ngẫu nhiên |
+| `author_id` | uuid | FK `auth.users.id`, **bí mật** |
+| `tag` | enum/text check | `CONFESSION`, `REVIEW_MON`, `TAI_LIEU`, `TIM_TRO`, `HOI_GAP` |
+| `body` | varchar(1000) | trim, 1–1.000 ký tự |
+| `display_mode` | enum | `ANONYMOUS`, `NICKNAME` |
+| `nickname_snapshot` | varchar(30) nullable | Chỉ có khi `NICKNAME` |
+| `contact_url` | text nullable | Chỉ áp dụng 2 tag và `NICKNAME`, hostname allowlist |
+| `status` | enum | `DRAFT`, `PUBLISHED`, `HIDDEN`, `DELETED` |
+| `idempotency_key` | uuid | Khóa tạo bài duy nhất theo người dùng |
+| `upvote_count` | int | ≥0, cache từ bảng vote |
+| `comment_count` | int | ≥0, cache từ bình luận đang hiển thị |
+| `created_at`, `published_at`, `updated_at` | timestamptz | `published_at` khi publish |
+
+**Constraints:** `UNIQUE(author_id,idempotency_key)`; `contact_url IS NULL` nếu ẩn danh hoặc không thuộc tag cho phép; status enum; `CHECK(upvote_count >=0, comment_count>=0)`.
+
+### `comments`
+
+`id uuid PK`, `post_id uuid FK`, `author_id uuid FK` **bí mật**, `idempotency_key uuid NOT NULL`, `body varchar(500)`, `status ('VISIBLE','HIDDEN','DELETED')`, `created_at`, `updated_at`. Ràng buộc `UNIQUE(author_id,idempotency_key)` cho request retry. Không hỗ trợ nested reply nên không có `parent_id`. API chỉ trả `is_owner` đối với người hiện tại và `is_original_poster` đúng khi commenter là author của **post đó**; không gửi `author_id`.
+
+### `post_votes`
+
+`post_id uuid FK`, `user_id uuid FK`, `created_at timestamptz`, PK `(post_id,user_id)`. Không có downvote. Đổi trạng thái vote phải atomic/idempotent theo request; tránh race giữa hai lần bấm.
+
+### `post_images`
+
+`id uuid PK`, `post_id uuid FK`, `storage_path text` **nội bộ**, `mime_type text`, `size_bytes int`, `position smallint (1..2)`, `status ('PENDING','READY')`, `created_at`. `UNIQUE(post_id,position)`; chỉ ảnh `READY` được xuất qua API; `post_images` không có email/MSSV trong tên file. `storage_path`: `posts/{post_uuid}/{image_uuid}.webp` hoặc định dạng cho phép.
+
+### `reports` — MVP W3
+
+`id uuid PK`, `reporter_id uuid FK` **bí mật**, `target_type ('POST','COMMENT')`, `target_id uuid`, `reason ('SPAM','HARASSMENT','PRIVACY','MISINFORMATION','COPYRIGHT','OTHER')`, `detail varchar(300) nullable`, `status ('PENDING','RESOLVED','DISMISSED')`, `created_at`, `resolved_at nullable`, `resolved_by uuid nullable`.
+
+- `UNIQUE(reporter_id,target_type,target_id)` để chặn trùng.
+- Target polymorphic phải được kiểm chứng tồn tại và phù hợp trong **Edge Function**; không tin `target_id` do client gửi.
+- Reporter identity chỉ admin xử lý nội bộ theo nguyên tắc cần biết, không trả cho tác giả bài.
+
+### `moderation_actions`
+
+`id uuid PK`, `admin_id uuid FK`, `target_type`, `target_id`, `action ('HIDE','RESTORE','BAN_USER','UNBAN_USER','REPORT_RESOLVE','REPORT_DISMISS')`, `reason text`, `created_at`. Chỉ insert qua luồng server đã authorize; không expose write cho client.
+
+### `rate_limit_counters` — mức cơ bản trước W2, nâng cấp W3
+
+`actor_id uuid`, `action varchar(40)`, `window_start timestamptz`, `count int`, PK `(actor_id,action,window_start)`. Dùng upsert atomic trong transaction/RPC; không dựa vào state của một Edge instance. Có job xóa cửa sổ cũ. Ngưỡng đề xuất để bắt đầu thử nghiệm (cấu hình được, không coi là chuẩn vĩnh viễn): 5 bài/15 phút; 30 bình luận/15 phút; 90 lượt tương tác vote/15 phút; 5 report/ngày. Prototype bắt buộc giới hạn tạo bài/bình luận cơ bản; W3 hoàn thiện giới hạn theo mọi action. Không dựa vào `X-Forwarded-For` chưa được xác thực để nhận dạng người dùng.
+
+## 3. Index đề xuất
+
+- `posts(status, published_at DESC, id DESC)`.
+- `posts(status, tag, published_at DESC, id DESC)`.
+- `posts(status, published_at DESC, upvote_count DESC)` cần xem EXPLAIN vì `hot` lọc 24 giờ và sort theo vote.
+- `comments(post_id, created_at ASC, id ASC)`.
+- `post_votes(post_id,user_id)` do PK; `post_images(post_id,position)` unique; `reports(status,created_at DESC)`.
+
+Không tạo index tràn lan trước khi đo query thực tế.
+
+## 4. Chế độ ẩn danh — threat model
+
+**Mục tiêu:** Người đọc thông thường không truy ra danh tính tài khoản thật của một bài `ANONYMOUS` bằng UI, REST API, Supabase Data API hoặc Storage.
+
+### Không được tiết lộ qua
+
+1. DTO: tuyệt đối không có `author_id`, `auth.uid`, email, MSSV, Google identity, `user_metadata`, `reporter_id`.
+2. Quan hệ: không trả profile ID hoặc author token ổn định để nối bài ẩn danh với nhau.
+3. Comment: khi chủ bài bình luận, chỉ có nhãn `Chủ bài`; không có nickname/ID tài khoản trong response.
+4. Media: đường dẫn object không chứa email, MSSV hoặc UUID của tác giả. Ảnh được loại EXIF/GPS khi xử lý trước upload; cần kiểm tra thực tế.
+5. Log: không log JWT, OTP, nội dung nhạy cảm; che email và IP khi không cần lưu.
+6. Client: không nhận row database nguyên gốc rồi xóa trường bằng JavaScript; server chỉ chọn trường được phép trả.
+
+**Giới hạn phải công bố:** tính ẩn danh áp dụng trước cộng đồng, không phải trước quản trị viên có thẩm quyền hay nhà cung cấp hạ tầng; người viết vẫn có thể tự tiết lộ danh tính qua nội dung/hình ảnh; signed URL có thể được chia sẻ trong thời hạn hiệu lực.
+
+## 5. Chính sách DB/Storage
+
+### Bảng nghiệp vụ
+
+- Bật RLS **trên mọi bảng nghiệp vụ** ở schema exposed.
+- **Thu hồi grants SELECT/INSERT/UPDATE/DELETE** của role `anon` và `authenticated` đối với các bảng `profiles`, `posts`, `comments`, `post_votes`, `post_images`, `reports`, `moderation_actions`, `user_roles`, `rate_limit_counters`. Không chỉ viết policy mà quên grants.
+- Frontend chỉ dùng Auth SDK, Edge Function và signed upload; không dùng `.from('posts')`.
+- Với `social-api`, chỉ sử dụng client quyền đặc biệt ở server; check user + domain + profile status + role + owner trước **mọi** hành động. Không tin `userId`, `role`, `authorId` truyền từ frontend.
+- Không tạo view `security definer` public mặc định mà chưa đánh giá nguy cơ bypass RLS.
+- Tài khoản admin được cấp qua seed/migration/bảng vai trò bởi người vận hành, không phải tự đăng ký từ UI.
+
+### Storage
+
+- Bucket `post-media` đặt **private**, chỉ JPG/PNG/WebP và giới hạn kích thước. Ảnh đọc dùng signed URL TTL mặc định 5 phút; token tải lên có thể còn hiệu lực tối đa theo quy định của Supabase (hiện 2 giờ), vì vậy phải kiểm tra quyền cả ở khâu cấp token và khi hoàn tất/publish.
+- Signed upload token được tạo **sau khi API xác minh quyền sở hữu DRAFT**; path server tạo bằng UUID ngẫu nhiên không chứa định danh.
+- `finalizeImage` xác minh metadata object và khớp bản ghi PENDING, chống reuse/chiếm upload token; publish chỉ khi tất cả ảnh READY.
+- Đọc ảnh: Edge Function xác minh user được phép xem bài, trả signed URL ngắn hạn. Hết hạn cần xin lại.
+- **Không có khả năng thu hồi ngay lập tức một signed URL đã cấp** chỉ bằng khóa bài; cần URL ngắn hạn, xử lý xóa/move object theo chính sách, cân nhắc cache.
+
+## 6. Authorization matrix
+
+| Tác vụ | Khách | Thành viên ACTIVE | Chủ nội dung | Admin |
+|---|---:|---:|---:|---:|
+| Đọc feed | ❌ | ✅ | ✅ | ✅ |
+| Tạo bài/comment/vote | ❌ | ✅ | ✅ | ✅ |
+| Xóa bài/comment của A | ❌ | ❌ | ✅ (A) | ✅ (ẩn/gỡ) |
+| Xem identity của tác giả ẩn danh | ❌ | ❌ | Chính bản thân với dữ liệu `/me` | Có điều kiện, log audit |
+| Đọc reports | ❌ | ❌ | ❌ | ✅ |
+| Ẩn, khôi phục bài, ban user | ❌ | ❌ | ❌ | ✅ |
+| Xem ảnh bài hiện hành | ❌ | ✅ qua URL tạm | ✅ | ✅ |
+
+**Lưu ý:** Các ô admin không có nghĩa API mặc định trả identity của tất cả mọi người. Chỉ cung cấp đủ để xử lý vi phạm và ghi audit.
+
+## 7. Kiểm thử DB/authorization (không thể bỏ)
+
+- `anon` gọi Data API `public.posts` → bị từ chối.
+- `authenticated` gọi trực tiếp Data API `public.posts`/`public.profiles` → bị từ chối, dù đã có OTP.
+- JWT email không hợp lệ, user banned → `social-api` trả 403.
+- B sở hữu JWT hợp lệ nhưng gửi `postId` của A trong thao tác xóa → 403.
+- B xem bài ẩn danh của A → không có identity trong JSON, ảnh URL, logs trả về.
+- A upvote 2 request đồng thời → chỉ có một vote và count nhất quán.
+- Admin bị giả mạo bằng client payload → 403; admin thật thực hiện hide → audit được ghi.
+- Người không đăng nhập không lấy được signed read URL của ảnh; bucket private không truy cập public.
+- Người dùng không được upload ảnh cho bài người khác và không được vượt 2 ảnh.
+
+## 8. Dữ liệu, retention và quyền riêng tư
+
+- Soft-delete bài và bình luận để xử lý khiếu nại có kiểm soát; không hiển thị nội dung đã xóa trong UI.
+- Xây quy trình yêu cầu xóa tài khoản/dữ liệu, lịch sử xử lý và thời hạn lưu trữ trước beta công khai; không cam kết "xóa vĩnh viễn" khi chưa triển khai.
+- Cần phương thức liên hệ nội dung vi phạm, và quy trình xử lý thông tin cá nhân bị công khai trái phép.
+- Với tài liệu nhạy cảm liên quan nhà trường, ưu tiên chỉ cho phép liên kết hoặc trao đổi sách vật lý hợp pháp, không host file lậu.
+
+**Nguồn kỹ thuật:** https://supabase.com/docs/guides/database/postgres/row-level-security · https://supabase.com/docs/guides/functions/auth · https://supabase.com/docs/guides/storage/buckets/fundamentals · https://supabase.com/docs/guides/storage/security/signing-keys
