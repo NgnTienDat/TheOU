@@ -68,3 +68,9 @@ test('từ chối project khác dù env, URL và CLI linked ref nhất quán', (
     }, otherRef), /không khớp/)
   }
 })
+
+test('T02 Gmail bị khóa khi người vận hành khai báo hook OU đã bật', () => {
+  assert.throws(() => readCloudTestConfig({ ...env, THEOU_OU_HOOK_ENABLED: 'true' }, ref), /không chạy suite T02/)
+  assert.throws(() => readCloudTestConfig({ ...env, THEOU_OU_HOOK_ENABLED: 'yes' }, ref), /chỉ nhận/)
+  assert.equal(readCloudTestConfig({ ...env, THEOU_OU_HOOK_ENABLED: 'false' }, ref).url, env.THEOU_TEST_SUPABASE_URL)
+})

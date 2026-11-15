@@ -5,6 +5,12 @@ export function readCloudTestConfig(env: NodeJS.ProcessEnv, linkedRef: string) {
   if (env.THEOU_ALLOW_CLOUD_TESTS !== 'theou-dev') {
     throw new Error('Chưa cho phép ghi dữ liệu kiểm thử Cloud. Chỉ chạy sau khi chủ dự án phê duyệt Giai đoạn B.')
   }
+  if (env.THEOU_OU_HOOK_ENABLED === 'true') {
+    throw new Error('Hook OU đã được khai báo bật: không chạy suite T02 tạo Gmail alias. Dùng manual OTP T03 với tài khoản OU; không tắt hook để test đạt.')
+  }
+  if (env.THEOU_OU_HOOK_ENABLED && env.THEOU_OU_HOOK_ENABLED !== 'false') {
+    throw new Error('THEOU_OU_HOOK_ENABLED chỉ nhận true, false hoặc để trống; phải đối chiếu Dashboard trước test Cloud.')
+  }
   const ref = env.THEOU_TEST_PROJECT_REF?.trim()
   if (ref !== developmentProjectRef || ref !== linkedRef.trim()) {
     throw new Error('Project ref kiểm thử không khớp project CLI đang liên kết.')

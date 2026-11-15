@@ -15,6 +15,7 @@ test('migration trên PostgreSQL tạm — không phải Supabase Cloud', async 
     create role anon;
     create role authenticated;
     create role service_role bypassrls;
+    create role supabase_auth_admin;
     create schema auth;
     create table auth.users (id uuid primary key);
     grant usage on schema public to anon, authenticated, service_role;
