@@ -50,7 +50,7 @@ flowchart TD
 
 Đây là một **backend nhẹ**, không phải lựa chọn “không backend”. Sau này NestJS sẽ thay chính lớp này.
 
-## 4. Tổ chức mã nguồn T01
+## 4. Tổ chức mã nguồn T01–T02
 
 ```text
 TheOU/
@@ -83,20 +83,25 @@ TheOU/
 │   └── tsconfig.json
 │
 ├── supabase/
-│   ├── migrations/              # Giữ chỗ; schema/RLS/grants bắt đầu T02
+│   ├── migrations/              # T02: schema, constraints, RLS/grants, triggers
 │   ├── functions/               # Giữ chỗ; social-api bắt đầu T04
-│   ├── tests/                   # Giữ chỗ cho test DB / quyền truy cập
+│   ├── tests/                   # PostgreSQL offline và integration Cloud tách biệt
+│   ├── package.json             # Tooling test Node, không phải REST backend
+│   ├── package-lock.json
+│   ├── tsconfig.json
+│   ├── .env.example             # Mẫu env test server, không dùng cho frontend
+│   ├── README.md                # Review và quy trình Giai đoạn A/B
 │   └── config.toml
 │
 ├── docs/                        # 7 tài liệu tiếng Việt
-├── .github/workflows/frontend.yml # CI lint/typecheck/test/build
+├── .github/workflows/           # CI frontend và DB offline; không deploy Cloud
 │
 ├── .gitignore
 ├── AGENTS.md
 └── README.md
 ```
 
-Các thư mục feature, components/constants và Supabase chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`; test tích hợp/E2E sẽ bổ sung khi có luồng nghiệp vụ. Từ T04, `supabase/functions/social-api/` gồm `index.ts`, `modules/` theo nghiệp vụ và `shared/` cho auth/errors/validation/client; không dồn toàn bộ logic vào entrypoint.
+Các thư mục feature, components/constants và `supabase/functions/` chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB đặt trong `supabase/tests/`. Từ T04, `supabase/functions/social-api/` gồm `index.ts`, `modules/` theo nghiệp vụ và `shared/` cho auth/errors/validation/client; không dồn toàn bộ logic vào entrypoint.
 
 T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanStack Query provider với retry mặc định tắt. `shared/lib/supabase.ts` cung cấp `getSupabaseClient()` khởi tạo khi cần từ env; dev/build kiểm tra URL và publishable key trước khi đóng gói. Không dùng JWT anon legacy hoặc key đặc quyền trong frontend. `.env.local` được Vite đọc tự động và không commit. Unit test dùng Node.js test runner tích hợp để tránh thêm dependency chỉ phục vụ nền tảng.
 
@@ -156,7 +161,7 @@ Post text không ảnh cũng qua `DRAFT → PUBLISHED`. Retry `createPost` phả
 
 ## 9. Triển khai và quan sát
 
-- **Môi trường:** local → staging (test) → production/beta; dùng Supabase project riêng staging/prod nếu khả thi.
+- **Môi trường:** frontend chạy tại máy, Development DB dùng Supabase Cloud **TheOU-dev**. Không dùng Docker/Supabase Local Stack. Staging/beta phải có phạm vi tài khoản và phê duyệt riêng. T02 dùng PGlite trong bộ nhớ để kiểm tra migration SQL offline; đây không phải Supabase server và không thay thế test Cloud. Mọi push migration và test ghi Cloud phải được chủ dự án phê duyệt trước.
 - **CI tối thiểu:** typecheck, lint, unit test, build, migrations smoke test, Edge tests và e2e chính.
 - **Secrets:** frontend chỉ có Supabase URL và publishable key; SMTP, storage admin và database secret chỉ lưu trên Supabase/Vercel server env nếu cần; không commit `.env`.
 - **Logging:** log request ID, action, status, thời lượng, error code; **không** log OTP, JWT, email nguyên dạng, nội dung bài nhạy cảm, IP nếu không cần.

@@ -1,6 +1,23 @@
 # 05 — Thiết kế Database, danh tính ẩn danh và bảo mật
 
-**Cảnh báo:** Đây là **đặc tả thiết kế**, không phải migration đã chạy. Codex phải viết migration + test phủ cả quyền được phép và quyền bị từ chối. RLS và grants là cổng an toàn; các Edge Functions dùng secret/admin vẫn phải tự kiểm tra quyền vì có thể bypass RLS.
+Đây là **đặc tả thiết kế**; phần schema T02 đã có migration và test quyền được phép/bị từ chối, đã triển khai lên Cloud. RLS và grants là cổng an toàn; các Edge Functions dùng secret/admin vẫn phải tự kiểm tra quyền vì có thể bypass RLS.
+
+**T02 — COMPLETED (15/11/2026):** migration `supabase/migrations/20261113170214_t02_schema_security.sql` đã áp dụng trên TheOU-dev; catalog đạt, offline 22/22 PASS, Cloud 8/8 PASS theo xác nhận chủ dự án và cleanup đã xác minh read-only. Timestamp tên file do CLI sinh theo UTC. Xem [báo cáo nghiệm thu](reports/T02-STATUS-REPORT.md); các phần nghiệp vụ/API bên dưới vẫn thuộc task tiếp theo.
+
+### Quyết định triển khai T02
+
+- Dùng UUID, `timestamptz`, `text + CHECK` cho trạng thái/tag; 9 bảng đúng đặc tả, kể cả cấu trúc `reports` để chuẩn bị W3. Chưa có API report, bucket Storage, trigger tạo profile Auth hoặc logic kiểm duyệt/rate limit.
+- FK tới `auth.users` và bài viết dùng `ON DELETE RESTRICT`: không tự cascade mất nội dung/audit khi xóa tài khoản. Luồng sản phẩm xóa mềm; quy trình xóa tài khoản thuộc T17. Chưa tự cấp admin hoặc lấy role từ metadata.
+- Tất cả bảng bật ENABLE/FORCE RLS, có restrictive policy `deny_direct_client` với `USING false/WITH CHECK false` cho `anon` và `authenticated`. Thu hồi mọi table privilege của hai role và `PUBLIC`; kể cả tác giả bài hoặc admin đăng nhập cũng không đọc/ghi bảng trực tiếp.
+- `service_role` chỉ có SELECT/INSERT/UPDATE/DELETE trên bảng cần CRUD; `moderation_actions` chỉ SELECT/INSERT, không UPDATE/DELETE/TRUNCATE. Role này bypass RLS: quyền domain/account/owner/admin vẫn là trách nhiệm `social-api` T04 trở đi, không được tuyên bố DB đã xác thực người gọi thay API.
+- Helper trigger nằm ở `theou_private`, SECURITY INVOKER, `search_path = ''`, không mở quyền cho client. Trigger chặn đổi ID/chủ sở hữu/idempotency key và quan hệ bài của comment/vote/ảnh; tự cập nhật `updated_at` cho profile/post/comment.
+- Không có public view/RPC/read model mở cho client ở T02. Server sẽ xuất DTO allowlist ở T06/T08: OP được suy ra bằng so sánh author của comment với post trong server, không gửi các UUID này về UI.
+- `ANONYMOUS` bắt buộc `nickname_snapshot` và `contact_url` NULL; `NICKNAME` cần snapshot 3–30 ký tự. Contact chỉ cho `TAI_LIEU`/`TIM_TRO`, HTTPS và các host `zalo.me`, `facebook.com`, `www.facebook.com`, `m.facebook.com`, `m.me`. Đây là allowlist cụ thể cho yêu cầu Zalo/Facebook/Messenger; thay đổi host cần migration/test, server vẫn phải parse URL.
+- Ảnh dùng path `posts/{post_id}/{image_id}.{jpg|png|webp}` tương ứng MIME, không chứa user ID; unique vị trí 1/2 giới hạn hai ảnh trên mỗi bài. Schema không xác thực nội dung file, EXIF hoặc signed URL; phần đó thuộc T10.
+- `reports.target_id` và `moderation_actions.target_id` đa hình không có FK, phải kiểm chứng tồn tại/phạm vi trong server. Counts hiện là cột không âm; RPC/transaction cập nhật count, publish/idempotency response và rate limit atomic phải bổ sung cùng nghiệp vụ T06/T08/T09/T16, chưa có bảo đảm atomic cho luồng ứng dụng ở T02.
+- Thu hồi default privileges cho object mới do `postgres` tạo trong `public`, và EXECUTE mặc định của PUBLIC cho function mới do `postgres` tạo ở mọi schema (Postgres không cho thu hồi global default bằng IN SCHEMA). Không sửa quyền object hiện có ngoài 9 bảng và helper của migration. Migration sau phải review/grant tường minh; role tạo object khác cần kiểm tra riêng.
+
+**Phân biệt tiêu chí:** “A được xóa bài mình, B bị từ chối” là test API tương lai (T06/T11). T02 kiểm tra A/B đều bị từ chối trên raw tables; server CRUD được phép không phải bằng chứng ownership authorization của API. Không mở client policies để vượt qua test sai tầng. Phần SQL metadata/constraints được kiểm tra offline; JWT thật/PostgREST chỉ được kết luận sau Giai đoạn B.
 
 ## 1. ERD tối giản
 

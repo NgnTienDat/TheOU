@@ -171,6 +171,8 @@ Các phương thức còn lại tuân theo cùng mẫu. `SupabaseSocialApiClient
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
+T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. Chưa có action chạy thực tế. Khi triển khai T04/T06/T08/T11 phải thêm test với phiên A/B thật: A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
+
 Pseudocode chung:
 
 ```text

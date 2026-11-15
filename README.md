@@ -4,7 +4,7 @@
 
 **Phiên bản tài liệu:** 1.0 — 13/11/2026
 
-**Trạng thái:** Đã bổ sung nền tảng frontend T01; chưa triển khai nghiệp vụ hoặc mở hệ thống cho người dùng.
+**Trạng thái:** T01 đã có nền tảng frontend; T02 **COMPLETED** ngày 15/11/2026: migration/catalog Cloud đạt, offline 22/22 PASS, Cloud integration 8/8 PASS theo xác nhận chủ dự án; cleanup đã xác minh read-only. Xem [báo cáo T02](docs/reports/T02-STATUS-REPORT.md).
 **Sản phẩm:** Mạng xã hội độc lập cho cộng đồng sở hữu email OU; không đại diện hay được bảo trợ bởi Trường Đại học Mở TP.HCM.
 
 ## Cấu trúc repository và chạy frontend
@@ -12,7 +12,7 @@
 ```text
 TheOU/
 ├── frontend/    # React + Vite + TypeScript, cấu hình và test frontend
-├── supabase/    # config.toml; migrations/, functions/, tests/ đang giữ chỗ
+├── supabase/    # Migration T02, test DB và config.toml; functions/ còn giữ chỗ
 ├── docs/        # 7 tài liệu đặc tả tiếng Việt
 ├── .github/     # CI kiểm tra frontend
 ├── .gitignore
@@ -22,7 +22,7 @@ TheOU/
 
 Dùng Node.js >= 22.18 (CI dùng 24). Trong `frontend/`, chạy `npm ci`, tạo `.env.local` từ `.env.example` nếu chưa có, điền URL và publishable key rồi chạy `npm run dev`. Xem [hướng dẫn frontend](frontend/README.md) để cấu hình và chạy lint/typecheck/test/build.
 
-Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/service-role key hay signing keys. T01 chỉ khai báo hợp đồng `SocialApiClient`, chưa gọi dữ liệu nghiệp vụ. Thư mục `supabase/` chưa có schema/migration; cấu hình CLI hiện có vẫn là mặc định phát triển, cần hoàn thiện quyền và Auth ở T02–T03 trước khi cho người dùng truy cập.
+Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/service-role key hay signing keys. T01 chỉ khai báo hợp đồng `SocialApiClient`, chưa gọi dữ liệu nghiệp vụ. Development dùng **Supabase Cloud TheOU-dev**, không Docker/Local Stack. Xem [hướng dẫn T02](supabase/README.md) để kiểm tra SQL offline và review trước khi cho phép triển khai Cloud. Cấu hình CLI hiện có chưa thay thế việc cấu hình Auth ở T03.
 
 ## Mục tiêu theo mốc
 
