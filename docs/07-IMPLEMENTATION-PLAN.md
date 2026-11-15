@@ -18,7 +18,7 @@
 | ID | Công việc | Phụ thuộc | Tiêu chí xong |
 |---|---|---|---|
 | T01 | Tạo Vite React TS, Tailwind, Router, TanStack Query, lint/test | — | CI chạy typecheck/build |
-| T02 | Tạo Supabase project local/staging, migration schema + RLS/grants | T01 | `anon`/`authenticated` không đọc raw tables |
+| T02 | Supabase Cloud Development TheOU-dev, migration schema + RLS/grants | T01 | **COMPLETED 15/11/2026:** migration/catalog đạt; offline 22/22, Cloud 8/8 PASS; cleanup đã xác minh |
 | T03 | Cấu hình Auth OTP, email template, SMTP và Before User Created Hook OU | T02 | Email đúng nhận mã; email ngoài OU bị chặn server-side |
 | T04 | Xây `social-api` auth guard, error wrapper, `getMe` | T02,T03 | JWT lỗi/banned bị từ chối |
 | T05 | UI đăng nhập/OTP, route guard, profile nickname | T03,T04 | Hoàn thành onboarding bằng OU account |
@@ -30,6 +30,8 @@
 **Kiểm tra T01 tại máy (13/11/2026):** `lint`, `typecheck`, `test` (6 test cấu hình môi trường), `build` đều thành công. Dev server khởi động và trả HTTP 200 cho HTML và các module chính. Đã kiểm tra Git bỏ qua env riêng và quét các file tracked/unignored tìm credentials. Chưa chạy CI trên GitHub, chưa kiểm thử giao diện bằng trình duyệt hoặc kết nối Supabase thật. `npm audit` báo 10 cảnh báo moderate trong chuỗi công cụ ESLint/TypeScript ESLint liên quan `minimatch`; chưa áp dụng downgrade/major change tự động. T01 không chứng minh gate W1 hay các user story nghiệp vụ đã hoàn thành. Task tiếp theo: **T02 — schema, RLS/grants và test quyền truy cập**.
 
 ### W2 — Tương tác, ảnh, công cụ admin, nghiệm thu Prototype
+
+**Trạng thái T02 (15/11/2026): COMPLETED.** Đã áp dụng migration `20261113170214_t02_schema_security.sql` đúng bản duyệt trên TheOU-dev, catalog đạt; offline 22/22 PASS, Cloud integration 8/8 PASS theo xác nhận chủ dự án. Kiểm tra read-only sau test: Auth users/identities T02 = 0, chín bảng nghiệp vụ đều rỗng. Xem [báo cáo nghiệm thu](reports/T02-STATUS-REPORT.md). T03 là task tiếp theo trong kế hoạch, chưa triển khai trong lượt nghiệm thu này.
 
 | ID | Công việc | Phụ thuộc | Tiêu chí xong |
 |---|---|---|---|
@@ -127,7 +129,7 @@
 | Tình huống | Quyết định |
 |---|---|
 | SMTP không gửi được tới OU | Ưu tiên khắc phục provider; không dùng bypass OU auth khi staging có người thật |
-| Tài khoản OU không có người test | Tạo email/OTP giả chỉ cho unit/local; không coi là E2E thật |
+| Tài khoản OU không có người test | Test DB T02 dùng tài khoản Auth giả trên Cloud dev sau phê duyệt; không gửi mail, không coi là test domain OU/OTP/E2E. Không tắt hook T03 để chạy test |
 | Ảnh làm trễ W2 | Giữ đúng luồng upload an toàn, báo thiếu một acceptance criterion; không dùng public bucket để chữa cháy |
 | Bảo mật ẩn danh chưa pass | Không mời người dùng mới; sửa trước tính năng/đẹp giao diện |
 | Moderation chưa có UI W2 | Không mở beta công khai; tối thiểu admin phải gỡ được nội dung trên staging |
@@ -142,11 +144,11 @@ npm run lint
 npm run typecheck
 npm run test
 npm run build
-# Tạo/khởi động Supabase local theo hướng dẫn CLI phiên bản đang dùng
-# Chạy migrations, DB permission tests và E2E tại staging
+# Kiểm tra DB offline: cd ../supabase && npm ci && npm run typecheck && npm test
+# Không chạy supabase start/db reset. Cloud dry-run/push/test chỉ sau phê duyệt.
 ```
 
-Các script trên đã khai báo trong `frontend/package.json`. Cần điền `frontend/.env.local` theo `.env.example` trước dev/build; CI dùng cấu hình công khai giả, không cần secret. Workflow `.github/workflows/frontend.yml` chạy lint, typecheck, unit test và build; chưa deploy, chưa kiểm thử DB/Edge/E2E. Không coi việc có workflow là bằng chứng CI đã chạy trên GitHub. Migrations và kiểm thử quyền thuộc T02 trở đi.
+Các script frontend khai báo trong `frontend/package.json`. Cần điền `frontend/.env.local` theo `.env.example` trước dev/build; CI frontend dùng cấu hình công khai giả. Workflow `.github/workflows/database.yml` chạy typecheck và PostgreSQL offline bằng PGlite, không có credentials Cloud. Không coi workflow là bằng chứng CI đã chạy trên GitHub hoặc kiểm thử Cloud đã đạt. Quy trình được phê duyệt và lệnh CLI v3 nằm trong `supabase/README.md`.
 
 ## 8. Báo cáo nghiệm thu mỗi tuần (mẫu)
 
