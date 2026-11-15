@@ -4,6 +4,37 @@
 
 T02 thuộc W1/Prototype, làm nền tảng cho US-02–US-10 và cấu trúc dữ liệu US-11–US-13. Không có Authentication UI, Edge Function nghiệp vụ, schema tạo thủ công trên Dashboard, Docker hoặc Supabase Local Stack.
 
+## T03-A — Điều chỉnh Authentication Flow (chờ review)
+
+**Yêu cầu mới 15/11/2026:** đăng ký email OU + mật khẩu → OTP 6 số xác minh email; đăng nhập email + mật khẩu, không yêu cầu OTP. Quên/đổi mật khẩu chưa triển khai trong T03. Giữ nguyên T02 và migration hook `20261115050213_t03_before_user_created_hook.sql` đã triển khai Cloud theo xác nhận chủ dự án; lượt này không sửa hoặc truy cập Cloud.
+
+Template `templates/email-otp.html` chỉ dùng cho **Confirm signup**, subject `Xác minh đăng ký TheOU`, OTP 6 số/600 giây. Không còn hướng dẫn dùng template này cho Magic Link. Confirm email phải bật; SMTP, template và chính sách mật khẩu cần được chủ dự án kiểm tra trên Dashboard sau review, không tự đồng bộ `config.toml`.
+
+Giữ `.env.auth.local` đang có; nếu chưa có thì sao chép `.env.example`. Nhóm manual chỉ cần THEOU_ALLOW_AUTH_TESTS=theou-dev, URL đúng dev và publishable key. Không lưu email cá nhân, mật khẩu, OTP hoặc secret key vào env. Runner nạp file bằng Node `--env-file=.env.auth.local`, nhập email/mật khẩu/OTP ẩn, không giữ history hoặc persist session.
+
+```powershell
+# Chỉ chủ dự án tự chạy sau review và cho phép gửi email:
+npm.cmd run auth:manual -- signup
+# Chỉ dùng khi đã có signup đang chờ và OTP còn hạn; không gửi email mới:
+npm.cmd run auth:manual -- verify-signup
+# Dùng cùng OU account đã xác minh và mật khẩu đã đăng ký:
+npm.cmd run auth:manual -- login
+# Gmail do mình quản lý + mật khẩu test riêng; không cần nhận OTP Gmail:
+npm.cmd run auth:manual -- reject
+# OU account đã tồn tại, sau khi tắt Enable magic links and email OTP:
+npm.cmd run auth:manual -- passwordless-denied
+```
+
+`signup` kiểm tra đúng mật khẩu vẫn bị `email_not_confirmed` trước OTP, rồi tự thử một mã sai trước mã đúng. `verify-signup` tiếp tục bước OTP bị gián đoạn. `login` tự thử một mật khẩu sai trước mật khẩu đúng, không gọi API gửi hoặc xác minh OTP. Mỗi mode logout local và kiểm tra session null; chỉ có dòng `PASS: hoàn tất kiểm tra ...` khi cả mode đạt.
+
+`passwordless-denied` nhập ẩn **cùng email OU đã đăng nhập password thành công**, không hỏi password/OTP. Dùng publishable key đã được guard kiểm tra, gọi trực tiếp `signInWithOtp({ email, options: { shouldCreateUser: false } })`. PASS với `otp_disabled` (loại trường hợp `Signups not allowed for otp`) hoặc `email_provider_disabled` kèm đúng thông báo `Login with magic link is disabled`; phải HTTP 4xx trừ 429 và không session trước/sau. Supabase dùng chung email_provider_disabled cho tắt Email provider và tắt riêng Magic Link, nên không chấp nhận chỉ code/422 hoặc thông báo chung. Xem [nhánh MagicLink chính thức](https://github.com/supabase/auth/blob/master/internal/api/magic_link.go). SMTP/mạng/rate limit, tắt Email provider chung và user không tồn tại không đạt. Người chạy xác nhận account trước; runner không dùng admin, không tạo user hoặc đổi settings. Nếu passwordless thực tế chưa tắt, request có thể gửi thư và sẽ FAIL; dừng, không nhập OTP hoặc thử liên tục.
+
+Sau sửa nhận diện lỗi MagicLink, typecheck và **47/47 offline tests PASS**. Lần Cloud trước trả email_provider_disabled/422, runner cũ chỉ chấp nhận otp_disabled nên FAIL; chưa xác nhận chính xác nhánh lỗi vì không in raw message. Chẩn đoán mới có `magicLinkDisabled=true` chỉ khi thông báo khớp nhánh tắt riêng Magic Link. Không in response thô/email/token; code lạ/thiếu hiển thị unknown_or_missing. Agent chỉ GET settings, xác nhận Email provider chung vẫn bật; không gọi lại OTP. T03 chờ chủ dự án chạy lại runner đã sửa và xác nhận signup/password không bị ảnh hưởng. Xem [báo cáo trạng thái](../docs/reports/T03-STATUS-REPORT.md). Kết quả kỳ vọng cuối cùng: `PASS: hoàn tất kiểm tra passwordless-denied.`
+
+Một OU account đủ cho luồng mới, nhưng account đã tạo bằng OTP trước đây có thể chưa có mật khẩu. Không dùng đăng ký lại để đặt mật khẩu, tự xóa account hoặc tự thêm luồng reset/updateUser; cần quyết định chuyển đổi riêng trước T03-B. Mode `login-existing` và `wrong-otp` cũ được thay bằng các lệnh phía trên. Đọc [T03-A Implementation](../docs/reports/T03-A-IMPLEMENTATION.md) để xem tiền điều kiện, kết quả kỳ vọng và điểm dừng khi có lỗi.
+
+Sau khi bật hook, giữ `THEOU_OU_HOOK_ENABLED=true` trong `.env.test.local`: runner T02 dừng trước API. Đây là khai báo vận hành, không tự truy vấn Dashboard. Không dùng Admin API/Gmail T02 làm bằng chứng domain, không tắt hook để chạy lại test. Typecheck và **41/41 offline tests PASS** sau đổi flow; chưa kiểm thử Cloud luồng mật khẩu. Kết quả Gmail reject của runner OTP cũ là lịch sử, chưa thay thế test `signUp` mới.
+
 ## Project và phạm vi migration
 
 Đã kiểm tra chỉ đọc bằng CLI **3.1.0**: `TheOU-dev`, ref `puhkisyehspcmgzerutm`, `linked: true`, `ACTIVE_HEALTHY`. Tên này tương ứng môi trường `theou-dev` trong yêu cầu. Trạng thái có thể đổi; phải kiểm tra lại trước Giai đoạn B. `config.toml` là cấu hình CLI, không phải bằng chứng liên kết; `.temp/` bị Git bỏ qua.
@@ -85,7 +116,7 @@ Chủ dự án xác nhận lần chạy sau sửa fixture đạt 8/8 PASS, 0 FAI
 - Server đọc fixture trên đủ tám bảng CRUD, kiểm tra một dòng và các field đã seed; không dùng LIMIT 0. Có fixture role ADMIN cho user A giả và cleanup theo user_id. Không seed audit trên Cloud; quyền audit được kiểm tra bằng catalog, INSERT hợp lệ được thực thi offline.
 - `t.after` đăng xuất, dọn dữ liệu/user của chính lượt chạy. Theo dõi cả ID bài insert thử để dọn nếu constraint bị thiếu. Không đụng user có sẵn, không reset/truncate. Không tạo audit fixture trên Cloud vì service-role cố ý không có quyền xóa audit; kiểm tra append audit thực hiện offline.
 
-**Giới hạn:** dọn dữ liệu là best effort nếu mất mạng/process bị kill hoặc schema sai; test báo lỗi nếu cleanup thất bại. Không tự nới grants để cleanup. Nếu xảy ra, review các Auth user theo runId trong alias và xóa dữ liệu test có phạm vi sau khi được duyệt; bộ lọc `.invalid` trong các báo cáo cũ chỉ áp dụng lượt test cũ. Sau T03, hook domain sẽ từ chối Gmail; cần fixture/session OU được phép, không tắt hook hoặc giả JWT.
+**Giới hạn:** dọn dữ liệu là best effort nếu mất mạng/process bị kill hoặc schema sai; test báo lỗi nếu cleanup thất bại. Không tự nới grants để cleanup. Nếu xảy ra, review các Auth user theo runId trong alias và xóa dữ liệu test có phạm vi sau khi được duyệt; bộ lọc `.invalid` trong các báo cáo cũ chỉ áp dụng lượt test cũ. Sau T03, không dùng suite Admin API/Gmail để nghiệm thu domain: đường Admin có thể không gọi hook. Runner có chốt khai báo trạng thái hook để dừng; xem hướng dẫn T03-A, không tắt hook hoặc giả JWT.
 
 Ownership qua `social-api`, public DTO khi đọc nhiều bài ẩn danh, OP, user BANNED/email ngoài OU, atomic counts, idempotent response và signed Storage thuộc T04/T06/T08–T11/T16. Những ca này **chưa có triển khai API để kiểm thử**, không được gắn nhãn pass khi test DB đạt.
 
