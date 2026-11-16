@@ -15,7 +15,9 @@
 
 **T05 — COMPLETED — PASS 16/11/2026:** UI login/signup/OTP/profile đã được chủ dự án duyệt; Cloud updateNickname và signup/OTP regression sau tắt passwordless đã PASS. Xem [nghiệm thu T05](docs/reports/T05-STATUS-REPORT.md) và [prototype/conventions](docs/fe-templates/README.md).
 
-**T06 — đang kiểm thử Cloud:** T06-A đạt local; chủ dự án đã triển khai migration/Edge/secret tại B.1–B.4. B.5 smoke A/B đã PASS ngày 16/11/2026, baseline posts=0 giữ nguyên; Supabase offline hiện 130/130 PASS. Controlled writes, DB concurrency và cleanup **chưa chạy/chờ duyệt riêng**, chưa COMPLETED; chưa làm Feed/Composer UI. Xem [Cloud tests](docs/reports/T06-B-CLOUD-TESTS.md) và [T06-A](docs/reports/T06-A-IMPLEMENTATION.md).
+**T06 — COMPLETED — PASS 16/11/2026:** migration/Edge, smoke A/B, controlled writes, DB verification và cleanup đã nghiệm thu; baseline cuối users=2/profiles=2/roles=0/posts=0. Xem [nghiệm thu T06](docs/reports/T06-STATUS-REPORT.md).
+
+**T07-A — local completed / pending UI review (17/11/2026):** Feed `/`, Composer text `/bai-viet/moi`, cache theo phiên và retry create/publish dùng cùng key/payload/postId. Chỉ kiểm thử offline với API giả; chưa kiểm thử E2E Cloud hoặc đánh dấu T07 COMPLETED. Xem [bàn giao T07-A](docs/reports/T07-A-IMPLEMENTATION.md).
 
 ```text
 TheOU/

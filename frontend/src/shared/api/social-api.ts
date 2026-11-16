@@ -81,10 +81,14 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
   }
   throw new SocialApiError('INTERNAL_ERROR')
 }
-export function createSocialApi(client: SupabaseClient): ImplementedApi {
+export function createSocialApi(client: SupabaseClient, accessToken?: string): ImplementedApi {
   async function invoke(action: Action, payload: object) {
     try {
-      const { data, error, response } = await client.functions.invoke('social-api', { body: { action, payload } })
+      const { data, error, response } = await client.functions.invoke('social-api', {
+        body: { action, payload }, timeout: 15_000,
+        // Gắn request với phiên lúc bắt đầu, không lấy nhầm JWT của tài khoản mới khi retry.
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+      })
       if (error) {
         if (response?.status === 401) throw new SocialApiError('UNAUTHENTICATED')
         if (response?.status === 403) throw new SocialApiError('FORBIDDEN')

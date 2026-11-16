@@ -41,6 +41,11 @@ export function createSessionController(auth: AuthService, api: { getMe(): Promi
   }
   return {
     getSnapshot: () => state,
+    getScope: () => epoch,
+    getAccessToken(expectedScope = epoch) {
+      if (expectedScope !== epoch || state.phase !== 'ready' || !current) throw new SocialApiError('UNAUTHENTICATED')
+      return current.token
+    },
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     start() {
       disposed = false

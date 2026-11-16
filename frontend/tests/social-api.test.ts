@@ -5,6 +5,17 @@ import { createSocialApi, parseSocialResponse, SocialApiError } from '../src/sha
 
 const me = { nickname: 'OUer offline', emailMasked: '***@ou.edu.vn', isAdmin: false }
 const envelope = (data: unknown) => ({ data, error: null, meta: { requestId: '00000000-0000-4000-8000-000000000001' } })
+test('adapter gắn JWT phiên lúc tạo, không dùng ngầm JWT hiện tại của SDK', async () => {
+  const headers: string[] = []
+  const client = createClient('https://offline.example.invalid', 'sb_publishable_offline', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: 'Bearer different-sdk-session' }, fetch: async (_input, init) => {
+      headers.push(new Headers(init?.headers).get('authorization')!); return Response.json(envelope(me))
+    } },
+  })
+  await createSocialApi(client, 'offline-captured-session').getMe()
+  assert.deepEqual(headers, ['Bearer offline-captured-session'])
+})
 test('adapter getMe/updateNickname gọi functions.invoke, data đúng allowlist', async () => {
   const calls: unknown[] = []
   const client = createClient('https://offline.example.invalid', 'sb_publishable_offline', {
