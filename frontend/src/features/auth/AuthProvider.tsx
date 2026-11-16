@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { getSupabaseClient } from '../../shared/lib/supabase.ts'
-import { createProfileApi } from '../../shared/api/social-api.ts'
+import { createSocialApi } from '../../shared/api/social-api.ts'
 import { createAuthService } from './auth-service.ts'
 import { createSessionController } from './session-controller.ts'
 import { clearPending, readPending, savePending, type PendingVerification } from './pending-verification.ts'
@@ -11,7 +11,7 @@ function useAuthRuntime() {
   const [runtime] = useState(() => {
     const client = getSupabaseClient()
     const auth = createAuthService(client)
-    const api = createProfileApi(client)
+    const api = createSocialApi(client)
     return { auth, api, controller: createSessionController(auth, api, cache) }
   })
   const state = useSyncExternalStore(runtime.controller.subscribe, runtime.controller.getSnapshot)

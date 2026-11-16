@@ -1,6 +1,26 @@
 # TheOU — Supabase Database, Auth và Social API
 
-## T04-A — Social API local, chờ review
+## T06-B.5 — Cloud smoke PASS, chưa chạy writes
+
+Chủ dự án đã triển khai migration/Edge/secret T06. Runner mới dùng hai OU accounts hiện có A/B, publishable key và cùng guard/env T03; không Admin API/raw tables hoặc tạo/xóa account. Lượt 16/11/2026 smoke đã PASS; read-only snapshot trước/sau users=2, profiles=2, roles=0, posts=0. Offline hiện **130/130 PASS**. Không coi feed rỗng là bằng chứng DTO/order/concurrency đã đạt.
+
+Từ `supabase/`: `npm.cmd run test:t06-cloud -- --smoke`. `.env.auth.local` dùng nhóm Auth T03; A/B nhập ẩn hoặc tự cấu hình THEOU_T06_EMAIL_A/PASSWORD_A/EMAIL_B/PASSWORD_B với đầy đủ tiền tố theo `.env.example`, không đưa giá trị thật vào Git/chat. getMe chỉ đọc profile có sẵn trong lượt này, đã xác nhận qua SQL read-only; không chạy smoke trên account chưa có profile nếu chưa review provisioning.
+
+Mode `--write` **chưa chạy**, chỉ dùng sau smoke PASS/phê duyệt riêng và cờ THEOU_ALLOW_T06_CLOUD_WRITES=theou-dev. Mode đó tạo dự kiến 5 post, không tự cleanup; inventory/verification/cleanup SQL nằm `.temp/t06-cloud/<runId>.*` đã ignore. SQL cleanup phải review và chủ dự án tự thực thi đúng UUID/key/body, không domain/prefix/DELETE tự động. Xem [báo cáo T06-B](../docs/reports/T06-B-CLOUD-TESTS.md) cho ca test, NOT TESTED và recovery mất response. T06 chưa COMPLETED; phần T06-A dưới là snapshot local trước deployment.
+
+## T06-A — Post API text local, chờ review
+
+T01–T05 đã COMPLETED; getMe/updateNickname đã deploy theo các báo cáo nghiệm thu. T06-A thêm local createPost/publishPost/listPosts/getPost, tái sử dụng guard/CORS/envelope, không mở quyền bảng. Supabase **116/116** và frontend **25/25** offline tests PASS; typecheck/lint/build và Deno check/lint/fmt PASS. Không gọi Cloud hoặc triển khai T06 trong lượt này.
+
+Migration mới `20261116141312_t06_atomic_post_publish.sql` thêm private SECURITY INVOKER trigger cho DRAFT → PUBLISHED: khóa profile ACTIVE, snapshot nickname, timestamp tại DB; không public RPC hoặc sửa T02/T03. INSERT unique + DO NOTHING giữ idempotency, payload khác key cũ trả CONFLICT. NEW/HOT dùng keyset max20, cursor ký HMAC, hạn 15 phút; HOT không phải snapshot khi vote/status thay đổi. Bài text chỉ images=[] khi không có image row; T10 phải mở rộng lại media.
+
+Trước T06-B, review [bàn giao T06-A](../docs/reports/T06-A-IMPLEMENTATION.md), migration và thay đổi contract. Cấu hình thêm **THEOU_POST_CURSOR_SECRET** trong Edge secrets: giá trị ngẫu nhiên 32 byte trở lên, base64url 43–128 ký tự, riêng biệt với key Auth/DB. Điền qua Dashboard/secrets file local đã ignore; không đưa giá trị vào CLI argument, log hoặc frontend. Ví dụ `functions/.env.example` để rỗng; Edge không tự đọc file này. Thiếu secret chỉ listPosts trả INTERNAL_ERROR; getMe không bị phụ thuộc secret mới.
+
+T06-B sau phê duyệt riêng: xác nhận ref/history và không có trigger/function trùng tên, migration list + dry-run chỉ thêm đúng migration T06; áp dụng migration **trước** deploy Edge, giữ verify_jwt=true và cấu hình Auth/SMTP hiện tại. Kiểm tra catalog/grants/private helper, PostgREST schema cache và bốn action bằng JWT A/B; kiểm thử race trên PostgreSQL thật, cursor và cleanup đúng post/user fixture. Không chạy lại T02 Gmail suite khi hook OU bật; fixture publish có ảnh của suite cũ cũng chưa tương thích trigger text T06. Không reset, mở grants hoặc sửa migration cũ để test đạt. Các bước Cloud này **chưa chạy/chưa được tự cho phép**.
+
+Các mục T04/T03 bên dưới giữ hướng dẫn và snapshot lịch sử; trạng thái nghiệm thu mới nhất ở báo cáo T04/T05 và mục T06 phía trên.
+
+## T04-A — Snapshot triển khai ban đầu
 
 **Trạng thái mới nhất:** chủ dự án đã deploy social-api, getMe hai lần PASS. Runner đã sửa allowlist JWT cho body code chuỗi/sb-error-code, kiểm tra header/body và session không đổi; offline 82/82 PASS. Chạy lại `npm.cmd run auth:manual -- get-me`, không cần redeploy cho sửa runner. Xem mục cuối [báo cáo T04-B.1](../docs/reports/T04-B1-RUNNER.md); phần T04-A/B.1 dưới đây là snapshot trước deployment.
 

@@ -7,7 +7,11 @@ const clients = createSupabaseClients(readEnv)
 
 Deno.serve(async (request: Request) => {
   try {
-    return await createSocialApiHandler({ ...clients, allowedOrigins: readAllowedOrigins(readEnv) })(request)
+    return await createSocialApiHandler({
+      ...clients,
+      allowedOrigins: readAllowedOrigins(readEnv),
+      readCursorSecret: () => readEnv('THEOU_POST_CURSOR_SECRET') ?? '',
+    })(request)
   } catch (error) {
     return failure(error, crypto.randomUUID(), new Headers({ 'cache-control': 'no-store' }))
   }

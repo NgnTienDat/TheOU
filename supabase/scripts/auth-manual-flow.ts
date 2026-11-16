@@ -41,7 +41,7 @@ async function requireNoSession(auth: ManualAuthClient): Promise<void> {
   requireCondition(!current.data.session, 'FAIL: thao tác bị từ chối hoặc đăng ký chưa xác minh vẫn có session.')
 }
 
-async function requireVerifiedSession(auth: ManualAuthClient, response: SessionResponse, email: string): Promise<Session> {
+export async function requireVerifiedSession(auth: ManualAuthClient, response: SessionResponse, email: string): Promise<Session> {
   requireSuccess(response.error, 'Xác thực thất bại. Kiểm tra cấu hình Auth; không in response thô.')
   requireCondition(response.data.session?.access_token, 'FAIL: Auth không trả session hợp lệ.')
   const current = await auth.getUser()

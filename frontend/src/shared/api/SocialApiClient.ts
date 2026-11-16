@@ -58,7 +58,7 @@ export interface CreateCommentInput {
   idempotencyKey: string
 }
 
-// Hợp đồng T01; adapter gọi Edge Function sẽ được bổ sung cùng các task nghiệp vụ.
+// Adapter hiện có getMe/updateNickname và bốn action post; comment/vote là contract task sau.
 export interface SocialApiClient {
   getMe(): Promise<Me>
   updateNickname(nickname: string): Promise<{ nickname: string }>

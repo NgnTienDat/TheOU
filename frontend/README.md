@@ -1,6 +1,6 @@
 ﻿# TheOU — Frontend
 
-React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. T05-A có Auth/Profile UI local theo [prototype đã duyệt](../docs/fe-templates/README.md); chưa triển khai bảng tin hoặc bài viết. Chưa nghiệm thu Cloud T05-B.
+React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. T05 Auth/Profile UI đã nghiệm thu theo [prototype đã duyệt](../docs/fe-templates/README.md). T06-A mở rộng adapter `createSocialApi` cho create/publish/list/get post với runtime DTO validation, NOT_FOUND/CONFLICT; chưa triển khai Feed/Composer UI hoặc deploy API post.
 
 ## Chạy tại máy
 
@@ -31,7 +31,7 @@ npm run build
 
 `npm run test:ui` dùng dev dependency `playwright-core` (đã pin trong lockfile) với Edge có sẵn trên Windows. Hệ khác đặt `THEOU_BROWSER_PATH` tới Chromium/Edge; script không tải browser. Vite riêng trên 127.0.0.1:5188 dùng env giả, mọi Auth/API được mock và host ngoài allowlist bị chặn. Không đọc email/mật khẩu thật. Ảnh kiểm tra nằm trong `node_modules/.cache/theou-ui/`, không commit. Script kiểm tra tương tác, responsive/dark-light và đối chiếu kích thước/tokens với HTML gốc; không thay thế kiểm thử Cloud hoặc screen reader thật.
 
-Bốn route: `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`; `/` tạm chuyển về cá nhân. Để kiểm thử Cloud sau review, cần deploy action updateNickname theo [bàn giao T05-A](../docs/reports/T05-A-IMPLEMENTATION.md). Phiên do Supabase SDK quản lý, email chờ xác minh lưu tạm sessionStorage; không tự lưu password/OTP/JWT vào storage riêng.
+Bốn route: `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`; `/` tạm chuyển về cá nhân. getMe/updateNickname đã deploy ở T04/T05; bốn action post T06 chỉ local, xem [bàn giao T06-A](../docs/reports/T06-A-IMPLEMENTATION.md). Phiên do Supabase SDK quản lý, email chờ xác minh lưu tạm sessionStorage; không tự lưu password/OTP/JWT vào storage riêng.
 
 ## Tổ chức mã nguồn
 
