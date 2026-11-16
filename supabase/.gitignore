@@ -3,6 +3,8 @@
 .temp
 # Manifest recovery T04 chỉ lưu local, kể cả khi Git ignore cha thay đổi.
 .temp/t04-cloud/
+# Inventory/verification/cleanup T06: chỉ local, không tự thực thi SQL.
+.temp/t06-cloud/
 
 # dotenvx
 .env.keys

@@ -60,7 +60,7 @@ interface PostPublic {
   body: string;
   displayMode: DisplayMode;
   authorLabel: string;            // "OUer ẩn danh" hoặc nickname snapshot
-  contactUrl: string | null;      // null nếu anonymous/không hợp lệ
+  contactUrl: string | null;      // null nếu anonymous/không cung cấp
   publishedAt: string;
   upvoteCount: number;
   commentCount: number;
@@ -119,19 +119,31 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 Với `listPosts`, tag `null` = tất cả; `HOT` chỉ lấy bài `publishedAt >= now() - 24h`. `getPost` chỉ trả bài `PUBLISHED` đối với người thường. Admin access nội dung ẩn đi qua action riêng, không biến `getPost` thành endpoint tiết lộ thông tin nhạy cảm.
 
-### Phạm vi triển khai T04-A — chỉ `getMe`
+### Phạm vi đã triển khai
 
-**Mở rộng local T05-A:** thêm `updateNickname` với payload chỉ `{nickname:string}`; trim, 3–30 Unicode code points, cấm URL/ký tự điều khiển. Guard OU/confirmed/ACTIVE như getMe; UPDATE filter ID từ Auth và status ACTIVE, chỉ đổi nickname. Data chỉ `{nickname}`; không nhận userId/role/status. Không migration/grants mới; chưa deploy action. Frontend gọi adapter, không truy cập bảng trực tiếp.
+T04/T05 đã nghiệm thu Cloud `getMe` và `updateNickname`. Nickname trim, 3–30 Unicode code points, cấm URL/ký tự điều khiển; UPDATE filter ID từ Auth và status ACTIVE, chỉ đổi nickname. Data chỉ `{nickname}`; không nhận userId/role/status. Frontend gọi adapter, không truy cập bảng trực tiếp.
 
-POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field thừa ở envelope/payload, body tối đa 4 KiB. Action khác hoặc request/method/content-type sai trả VALIDATION_ERROR/400. Guard từ chối JWT thiếu/sai/hết hạn bằng UNAUTHENTICATED/401; email ngoài OU/chưa xác minh hoặc BANNED bằng FORBIDDEN/403. Lỗi Auth/DB hệ thống trả INTERNAL_ERROR/500 với thông báo chung; không đưa response gốc vào details/log.
+POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field thừa ở envelope/payload. T06-A tăng giới hạn stream từ 4 lên **16 KiB** để chứa 1.000 Unicode code points kể cả JSON escape. Action chưa hỗ trợ hoặc request/method/content-type sai trả VALIDATION_ERROR/400. Guard từ chối JWT thiếu/sai/hết hạn bằng UNAUTHENTICATED/401; email ngoài OU/chưa xác minh hoặc BANNED bằng FORBIDDEN/403. Lỗi Auth/DB hệ thống trả INTERNAL_ERROR/500 với thông báo chung; không đưa response gốc vào details/log.
 
 Data đúng ba trường `{ "nickname": "OUer-1234", "emailMasked": "***@ou.edu.vn", "isAdmin": false }`, không trả UUID/email đầy đủ/metadata. EmailMasked chỉ thuộc chính chủ; che toàn bộ local part để không lộ MSSV. Profile thiếu được insert an toàn, giữ hàng thắng khi concurrent/retry; profile đã tồn tại không bị thay đổi. Role ADMIN chỉ đọc từ DB.
 
-OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend xử lý lỗi gateway riêng. Ngoài getMe và updateNickname local T05-A, các action còn lại trong bảng mục 3 là thiết kế, chưa triển khai.
+OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend xử lý lỗi gateway riêng. T06-A bổ sung local bốn action post dưới đây; các action comment/vote/media/moderation/delete vẫn là thiết kế.
+
+### T06-A — bốn action post text (local, chờ review)
+
+- `createPost`: body trim, 1–1.000 Unicode code points, không NUL/lone surrogate; đúng năm tag và hai mode đã khai báo. Không nhận field identity/status/count/timestamp. UUID idempotency key được chuẩn hóa lowercase. `contactUrl` vắng/null cùng nghĩa; URL khác null chỉ cho NICKNAME + TAI_LIEU/TIM_TRO, tối đa 2.048 ký tự, không whitespace/control, HTTPS, không credentials/port khác mặc định, đúng hostname `zalo.me`, `facebook.com`, `www.facebook.com`, `m.facebook.com`, `m.me`. URL parser chuẩn hóa trước khi lưu/so sánh; URL ngoài chính sách bị từ chối, không tự bỏ qua.
+- Cùng author/key và cùng payload đã chuẩn hóa trả cùng `{postId,status:'DRAFT'}` ACK; payload khác trả CONFLICT/409, không sửa hàng cũ. ACK vẫn giữ nguyên khi retry sau publish, **không mô tả trạng thái hiện tại hoặc đưa bài trở về DRAFT**. DRAFT không có API đọc công khai.
+- `publishPost`: payload chỉ `{postId: UUID}`. UPDATE tại DB có đủ id/author/status=DRAFT; trigger riêng gán publishedAt và nickname snapshot theo profile ACTIVE đã khóa lúc publish. NICKNAME draft phải lưu snapshot tạm để thỏa CHECK T02; khi publish DB thay bằng nickname tại thời điểm đó. ANONYMOUS luôn snapshot/contact null. Replay bài PUBLISHED của chính chủ giữ timestamp/snapshot; HIDDEN/DELETED trả CONFLICT/409; thiếu hoặc khác chủ cùng NOT_FOUND/404.
+- `getPost`: chỉ PUBLISHED, kể cả caller là chủ bài hoặc ADMIN; thiếu/DRAFT/HIDDEN/DELETED cùng NOT_FOUND/404. DTO đúng 12 field PostPublic, không serialize row. `isMine` tính theo caller; `hasUpvoted` đọc vote thực của caller, counts lấy cột DB, không tạo dữ liệu giả.
+- Giai đoạn text: `images=[]` sau khi xác minh không có image row. Publish từ chối bài có ảnh; đọc bài có image row trả INTERNAL_ERROR an toàn thay vì giấu ảnh/giả signed URL. T10 cần mở rộng trigger/mapper/adapter cùng giao thức media.
+- `listPosts`: sort bắt buộc NEW/HOT, tag null hoặc đúng năm tag, cursor null/chuỗi, limit nguyên **1–20**. Chỉ PUBLISHED; NEW giảm dần `(published_at,id)`, HOT 24 giờ tại mỗi request giảm dần `(upvote_count,published_at,id)`. Timestamp giữ microseconds để phân trang chính xác khi cùng millisecond.
+- Cursor tối đa 1.024 ký tự, ký HMAC-SHA256 với secret chỉ ở Edge `THEOU_POST_CURSOR_SECRET` (base64url ngẫu nhiên tối thiểu 32 byte, 43–128 ký tự). Gắn sort/tag, mốc trên lần đọc đầu, tuple cuối và version; hạn 15 phút, không chứa author ID/email. Client coi cursor là opaque; giả/sai định dạng/hết hạn/đổi filter trả VALIDATION_ERROR/400, cấu hình thiếu secret trả INTERNAL_ERROR/500. Đổi secret làm cursor cũ hết hiệu lực; tải lại từ cursor null.
+- Mốc trên loại bài mới hơn lần đọc đầu; không khóa trạng thái/count của feed. Anchor bị ẩn/xóa vẫn dùng tuple cursor; HOT có thể lặp/bỏ sót khi votes thay đổi và cutoff 24 giờ dịch chuyển. T07 dedupe theo post.id và refresh; **không có snapshot consistency**.
+- Query nghiệp vụ post dùng chung deadline 10 giây sau guard và signal hủy request; lỗi trả INTERNAL_ERROR/500. Timeout không bảo đảm DB chưa commit: retry create bằng cùng key/payload, publish bằng cùng postId. Deadline này không phải timeout toàn bộ pipeline Auth/đọc request.
 
 ## 4. Các thao tác cần atomic và idempotent
 
-- `createPost`: client tạo `idempotencyKey` UUID khi bắt đầu submit; request cùng `(author_id,key)` trả về **cùng một draft**, không tạo thêm.
+- `createPost`: client giữ `idempotencyKey` UUID cho một lần submit; INSERT ON CONFLICT DO NOTHING rồi đọc theo author/key và so payload chuẩn hóa, không SELECT trước INSERT hoặc merge nội dung. Retry cùng payload trả ACK gốc, payload khác CONFLICT.
 - `publishPost`: gọi lại trên bài đã publish của cùng tác giả thì trả bản hiện tại; bài bị ẩn/xóa phải xử lý `CONFLICT`.
 - `createComment`: unique `(author_id, idempotency_key)` để retry không nhân đôi bình luận.
 - `toggleUpvote`: dùng `desiredState` thay vì “đảo trạng thái” mù. Ví dụ 2 request `{desiredState:true}` không thể bỏ vote của nhau; DB `UNIQUE(post_id,user_id)`.
@@ -163,7 +175,7 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
     "status": "DRAFT"
   },
   "error": null,
-  "meta": { "requestId": "req-demo-001" }
+  "meta": { "requestId": "00000000-0000-4000-8000-000000000001" }
 }
 ```
 
@@ -179,11 +191,11 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
 6. `publishPost` xác nhận tất cả ảnh READY, số lượng ≤2 và field hợp lệ.
 7. `listPosts`/`getPost` trả signed read URLs ngắn hạn (mặc định TTL 300 giây) cho ảnh READY của các bài được phép xem; token hết hạn phải làm mới.
 
-Đây là ngoại lệ có kiểm soát cho việc frontend gọi Storage SDK; frontend **không** tự chọn quyền truy cập hoặc liệt kê bucket.
+Đây là thiết kế T10, chưa triển khai ở T06-A. T06 chỉ hỗ trợ bài text không image row. Frontend **không** tự chọn quyền truy cập hoặc liệt kê bucket.
 
 ## 7. API Adapter phía frontend
 
-**Trạng thái T01:** `frontend/src/shared/api/SocialApiClient.ts` chỉ khai báo interface, input và DTO dưới đây. Chưa có adapter, mock nghiệp vụ hay request tới `social-api`. Bổ sung adapter và chuẩn hóa lỗi cùng các task T04/T06 trở đi; TypeScript không thay thế validation runtime và kiểm thử bảo vệ danh tính khi tích hợp API.
+`frontend/src/shared/api/SocialApiClient.ts` giữ interface/input/DTO. Factory `createSocialApi` trong `social-api.ts` đã có getMe/updateNickname và bốn action post T06 local; dùng functions.invoke, kiểm tra response runtime theo allowlist, chuẩn hóa lỗi gồm NOT_FOUND/CONFLICT. Không đọc bảng trực tiếp; chưa tạo Feed/Composer UI. Comment/vote/media trong interface chưa có adapter thực thi.
 
 ```ts
 interface SocialApiClient {
@@ -197,11 +209,11 @@ interface SocialApiClient {
 }
 ```
 
-Các phương thức còn lại tuân theo cùng mẫu. `SupabaseSocialApiClient` ánh xạ interface này sang `social-api` actions. Khi chuyển NestJS, viết `HttpSocialApiClient` nhưng giữ DTO và hook UI. Chuẩn hóa exception trong adapter, không để component trực tiếp xử lý lỗi Supabase thô.
+Các phương thức còn lại tuân theo cùng mẫu. `createSocialApi` ánh xạ phần interface đã triển khai sang `social-api` actions. Khi chuyển NestJS, giữ DTO và hook UI. Chuẩn hóa exception trong adapter, không để component trực tiếp xử lý lỗi Supabase thô.
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
-T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04 đã nghiệm thu getMe/guard trên Cloud và BANNED/ADMIN/RACE; updateNickname T05-A hiện chỉ local. Khi triển khai T05-B/T06/T08/T11 phải thêm test với phiên thật theo phạm vi: updateNickname chính chủ; A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
+T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04/T05 đã nghiệm thu getMe/guard/updateNickname trên Cloud; T06-A mới kiểm thử offline bốn action post. T06-B phải kiểm chứng A tạo/publish, B đọc với isMine=false và không publish draft của A; nhiều bài anonymous không lộ khóa nối tác giả. Delete/OP thuộc T08/T11. Test CRUD service-role hoặc PGlite không thay thế JWT/PostgREST/transaction Cloud thật. Lỗi SQL/constraint phải map sang message an toàn ở Edge/adapter.
 
 Pseudocode chung:
 

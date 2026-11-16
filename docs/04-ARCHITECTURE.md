@@ -50,7 +50,7 @@ flowchart TD
 
 Đây là một **backend nhẹ**, không phải lựa chọn “không backend”. Sau này NestJS sẽ thay chính lớp này.
 
-## 4. Tổ chức mã nguồn T01–T04-A
+## 4. Tổ chức mã nguồn T01–T06-A
 
 ```text
 TheOU/
@@ -67,7 +67,7 @@ TheOU/
 │   │   │   ├── profile/
 │   │   │   └── moderation/
 │   │   ├── shared/
-│   │   │   ├── api/            # SocialApiClient + DTO; adapter ở task sau
+│   │   │   ├── api/            # SocialApiClient + DTO + adapter invoke/runtime validation
 │   │   │   ├── components/
 │   │   │   ├── constants/
 │   │   │   └── lib/
@@ -83,8 +83,8 @@ TheOU/
 │   └── tsconfig.json
 │
 ├── supabase/
-│   ├── migrations/              # T02: schema, constraints, RLS/grants, triggers
-│   ├── functions/social-api/    # T04-A: index.ts, handler.ts, shared/, modules/profile/
+│   ├── migrations/              # T02/T03 và trigger publish T06 local
+│   ├── functions/social-api/    # index.ts, handler.ts, shared/, modules/profile/, modules/posts/
 │   ├── tests/                   # PostgreSQL offline và integration Cloud tách biệt
 │   ├── package.json             # Tooling test Node, không phải REST backend
 │   ├── package-lock.json
@@ -101,7 +101,7 @@ TheOU/
 └── README.md
 ```
 
-Các thư mục feature, components/constants chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04 có `social-api/index.ts` khởi động Deno, `handler.ts` dispatch, `modules/profile/` cho getMe và `shared/` cho guard/errors/validation/client. T04 đã nghiệm thu getMe trên Cloud; T05-A thêm updateNickname local, chưa deploy, chưa có action post/comment/media.
+Các thư mục feature chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04/T05 đã nghiệm thu getMe/updateNickname trên Cloud. T06-A thêm local `modules/posts/` gồm service bốn action, validation, mapper và cursor; chưa có action comment/vote/media. `index.ts` khởi động Deno, `handler.ts` dispatch và tái sử dụng shared guard/errors/client/CORS.
 
 **Quyết định T04-A:** gateway giữ `verify_jwt = true`; handler gọi `auth.getUser(token)` bằng publishable client để xác minh với Auth server. Chỉ sau khi email chính xác domain OU và đã xác minh mới khởi tạo client đặc quyền, đọc profile bằng ID từ Auth, chặn BANNED rồi đọc ADMIN từ `user_roles`. Các lượt đọc profile/role này là một phần authorization bắt buộc vì T02 khóa raw tables đối với user client. Client đặc quyền không nhận session/Authorization từ request.
 
@@ -111,7 +111,7 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 
 ## 5. Ranh giới frontend và API
 
-**T05-A local:** UI theo [baseline](fe-templates/README.md). Feature Auth chứa service, session controller/provider và bốn trang; shared API adapter validate envelope/DTO. SDK tự quản lý session, listener chỉ chuyển state đồng bộ rồi tải getMe ngoài callback; không lưu token riêng. Cache profile gắn với phiên, xóa khi đổi user/logout/401/403; protected route chờ Auth và getMe. SessionStorage chỉ giữ email/thời điểm chờ xác minh, localStorage chỉ thêm theme preference. `updateNickname` dùng lại guard/module profile, chưa deploy.
+**T05 COMPLETED:** UI theo [baseline](fe-templates/README.md). Feature Auth chứa service, session controller/provider và bốn trang; shared API adapter validate envelope/DTO. SDK tự quản lý session, listener chỉ chuyển state đồng bộ rồi tải getMe ngoài callback; không lưu token riêng. Cache profile gắn với phiên, xóa khi đổi user/logout/401/403; protected route chờ Auth và getMe. SessionStorage chỉ giữ email/thời điểm chờ xác minh, localStorage chỉ thêm theme preference. `updateNickname` đã deploy. Factory `createSocialApi` T06 bổ sung bốn action post nhưng chưa có Feed/Composer UI.
 
 - UI dùng hooks (`useFeed`, `useCreatePost`, `useComments`, `useToggleVote`) gọi `postApi`, `commentApi`, ...
 - Adapter hiện tại gọi `supabase.functions.invoke('social-api', { body: { action, payload } })`.
@@ -125,7 +125,7 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 
 1. Đăng ký: module Auth gọi `signUp({ email, password })` với email thuộc chính xác `@ou.edu.vn`; mật khẩu không trim, tối thiểu 8 ký tự và tối đa 72 byte UTF-8. Supabase Auth lưu hash, không đưa mật khẩu qua social-api hoặc app DB.
 2. **Before User Created Hook** giữ nguyên, chặn tạo tài khoản email ngoài domain phía server. Confirm email phải bật: signup trả session null.
-3. Template **Confirm signup** dùng `{{ .Token }}` để gửi OTP 6 số; `verifyOtp({ email, token, type: 'email' })` xác minh đăng ký và trả session. Gửi lại dùng `resend({ type: 'signup', email })` theo cooldown, chưa triển khai UI T05.
+3. Template **Confirm signup** dùng `{{ .Token }}` để gửi OTP 6 số; `verifyOtp({ email, token, type: 'email' })` xác minh đăng ký và trả session. UI T05 gửi lại bằng `resend({ type: 'signup', email })` theo cooldown.
 4. Đăng nhập: `signInWithPassword({ email, password })`, không gọi `signInWithOtp`, không yêu cầu OTP. Email chưa xác minh hoặc mật khẩu sai không có session.
 5. Mỗi Edge Function user-facing kiểm tra JWT còn hiệu lực, email OU **đã xác minh**, account ACTIVE và role khi cần; việc đăng ký trước đây không thay thế kiểm tra phiên hiện tại.
 6. Đăng xuất dọn session; không lưu mật khẩu/OTP/JWT trong log. Chưa triển khai quên/đổi mật khẩu hoặc tự chuyển đổi tài khoản OTP cũ trong T03.
@@ -133,6 +133,8 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 **Cấu hình bắt buộc:** custom SMTP trước khi thử nghiệm nhiều tài khoản; máy chủ email mặc định của Supabase chỉ phục vụ thử nghiệm hạn chế. Các rate limit/auth options có thể thay đổi theo nhà cung cấp và cấu hình dự án.
 
 **T03 COMPLETED (16/11/2026):** hook domain đã triển khai, passwordless bị tắt phía server; password login regression PASS theo chủ dự án. Signup/OTP đã PASS trước thay đổi settings; regression sau thay đổi chuyển T05 khi có OU account mới. Hook không kiểm soát Admin API hoặc đăng nhập account đã tồn tại, nên guard T04 vẫn kiểm tra email/confirmed/status từng request. Xem [nghiệm thu T03](reports/T03-STATUS-REPORT.md).
+
+**T05 đã hoàn tất regression:** chủ dự án xác nhận signup OU alias +t05, SMTP/OTP xác minh và password login sau tắt passwordless PASS. Alias policy theo AUTH-ALIAS-001, không xử lý trong T06.
 
 ## 7. Luồng đăng bài có ảnh
 
@@ -162,10 +164,12 @@ sequenceDiagram
 
 Post text không ảnh cũng qua `DRAFT → PUBLISHED`. Retry `createPost` phải có `idempotency_key`, hoặc API tìm draft cũ theo `(author_id, key)`; tránh tạo hai bài khi timeout. Dọn draft và file mồ côi theo kỳ ở MVP; prototype có quy trình thủ công documented.
 
+**T06-A chỉ text:** INSERT ON CONFLICT DO NOTHING rồi đối chiếu payload; publish dùng UPDATE có điều kiện owner/DRAFT và trigger riêng khóa profile, lấy snapshot, đặt timestamp trong cùng statement. Không RPC public. Media trong sơ đồ là thiết kế T10: hiện publish từ chối image row và mapper chỉ xuất images=[] khi không có ảnh. Migration/Edge T06 chưa triển khai Cloud.
+
 ## 8. Sắp xếp và phân trang
 
-- `Mới nhất`: keyset cursor `(published_at, id)`, 20 bài/trang, giới hạn 50/trang.
-- `Nổi bật 24h`: upvote giảm dần, sau đó thời gian và ID; giai đoạn đầu dùng offset cursor đã được validate, giới hạn số trang để tránh truy vấn quá sâu. Khi vote thay đổi có thể trùng/nhảy bài; client dedupe theo `post.id`.
+- T06-A dùng keyset cho cả NEW `(published_at,id)` và HOT `(upvote_count,published_at,id)`, giảm dần, tối đa 20 bài/trang. Quyết định này thay mô tả cũ offset HOT/giới hạn 50 theo yêu cầu T06 mới.
+- Cursor ký HMAC, gắn sort/tag và mốc trên của lần đọc đầu, hạn 15 phút; không chứa author ID. HOT lọc 24 giờ so với thời điểm mỗi request. Vote/status thay đổi vẫn có thể gây lặp/bỏ sót: T07 cần dedupe theo post.id và refresh, không có snapshot consistency.
 - Cập nhật count (`upvote_count`, `comment_count`) trong **transaction tại database** hoặc RPC atomic; không increment ngây thơ từ nhiều HTTP request.
 - Index theo `status, published_at` và tag; đo bằng EXPLAIN trước khi thêm index mới.
 

@@ -13,12 +13,14 @@
 
 ## Cấu trúc repository và chạy frontend
 
-**T05 UI baseline đã duyệt:** xem [prototype và conventions](docs/fe-templates/README.md). T05-A triển khai local login `/dang-nhap`, signup `/dang-ky`, OTP `/xac-thuc`, profile `/ca-nhan`; chưa nghiệm thu Cloud. T01–T04 giữ trạng thái đã nghiệm thu theo kế hoạch.
+**T05 — COMPLETED — PASS 16/11/2026:** UI login/signup/OTP/profile đã được chủ dự án duyệt; Cloud updateNickname và signup/OTP regression sau tắt passwordless đã PASS. Xem [nghiệm thu T05](docs/reports/T05-STATUS-REPORT.md) và [prototype/conventions](docs/fe-templates/README.md).
+
+**T06 — đang kiểm thử Cloud:** T06-A đạt local; chủ dự án đã triển khai migration/Edge/secret tại B.1–B.4. B.5 smoke A/B đã PASS ngày 16/11/2026, baseline posts=0 giữ nguyên; Supabase offline hiện 130/130 PASS. Controlled writes, DB concurrency và cleanup **chưa chạy/chờ duyệt riêng**, chưa COMPLETED; chưa làm Feed/Composer UI. Xem [Cloud tests](docs/reports/T06-B-CLOUD-TESTS.md) và [T06-A](docs/reports/T06-A-IMPLEMENTATION.md).
 
 ```text
 TheOU/
 ├── frontend/    # React + Vite + TypeScript, cấu hình và test frontend
-├── supabase/    # Migrations T02/T03, tests DB/Auth/API, Edge Function social-api
+├── supabase/    # Migrations, tests DB/Auth/API, Edge Function social-api
 ├── docs/        # 7 tài liệu đặc tả tiếng Việt
 ├── .github/     # CI kiểm tra frontend
 ├── .gitignore
@@ -28,7 +30,7 @@ TheOU/
 
 Dùng Node.js >= 22.18 (CI dùng 24). Trong `frontend/`, chạy `npm ci`, tạo `.env.local` từ `.env.example` nếu chưa có, điền URL và publishable key rồi chạy `npm run dev`. Xem [hướng dẫn frontend](frontend/README.md) để cấu hình và chạy lint/typecheck/test/build.
 
-Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/service-role key hay signing keys. T01 chỉ khai báo hợp đồng `SocialApiClient`, chưa gọi dữ liệu nghiệp vụ. Development dùng **Supabase Cloud TheOU-dev**, không Docker/Local Stack. Xem [hướng dẫn T02](supabase/README.md) để kiểm tra SQL offline và review trước khi cho phép triển khai Cloud. Cấu hình CLI hiện có chưa thay thế việc cấu hình Auth ở T03.
+Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/service-role key hay signing keys. Frontend gọi nghiệp vụ bằng adapter `createSocialApi`; không truy cập bảng trực tiếp. Development dùng **Supabase Cloud TheOU-dev**, không Docker/Local Stack. Xem [hướng dẫn Supabase](supabase/README.md) để kiểm tra offline và review trước khi triển khai Cloud.
 
 ## Mục tiêu theo mốc
 

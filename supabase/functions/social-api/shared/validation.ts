@@ -1,6 +1,7 @@
 import { ApiError } from './response.ts'
+import { type PostRequest, validatePostRequest } from '../modules/posts/post-validation.ts'
 
-export type SocialRequest = { action: 'getMe'; payload: Record<string, never> } | {
+export type SocialRequest = PostRequest | { action: 'getMe'; payload: Record<string, never> } | {
   action: 'updateNickname'
   payload: { nickname: string }
 }
@@ -34,7 +35,7 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
       const { value, done } = await reader.read()
       if (done) break
       size += value.byteLength
-      if (size > 4096) {
+      if (size > 16384) {
         await reader.cancel()
         throw new ApiError('VALIDATION_ERROR')
       }
@@ -68,7 +69,7 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
   ) {
     return { action: 'updateNickname', payload: { nickname: validateNickname(body.payload.nickname) } }
   }
-  throw new ApiError('VALIDATION_ERROR')
+  return validatePostRequest(body.action, body.payload)
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

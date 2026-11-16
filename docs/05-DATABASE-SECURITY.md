@@ -8,7 +8,16 @@
 
 **T04 — COMPLETED 16/11/2026, getMe đã deploy:** guard xác minh bằng Auth server, chỉ dùng ID/email đã xác minh từ Auth. Client đặc quyền đọc `profiles` và `user_roles` để kiểm tra ACTIVE/ADMIN; mỗi truy vấn filter theo ID chính chủ, không lấy quyền từ metadata/payload. Khởi tạo profile dùng INSERT ON CONFLICT DO NOTHING rồi đọc lại, không UPDATE trạng thái/nickname hoặc role. Không sửa migration/grants/RLS T02; không có migration mới. `getMe` chỉ trả nickname, email che toàn bộ local part (`***@ou.edu.vn`) và boolean isAdmin. Các request đang xử lý không được khóa cùng thao tác ban; request sau phải đọc trạng thái mới, không cache authorization.
 
-**T05-A local:** updateNickname tái sử dụng guard, chỉ PATCH nickname, filter ID do Auth xác minh và status ACTIVE trong chính UPDATE. Không sửa migration/grants/RLS; chưa deploy action hoặc kiểm thử Cloud.
+**T05 — COMPLETED 16/11/2026:** updateNickname đã deploy/nghiệm thu theo chủ dự án; chỉ PATCH nickname, filter ID do Auth xác minh và status ACTIVE trong chính UPDATE. Signup OU + OTP regression sau tắt passwordless đã PASS tại T05. Không sửa migration/grants/RLS T02/T03.
+
+### T06-A — Post API text local, chờ review
+
+- Giữ nguyên schema/constraints/indexes T02, hook T03 và quyền bảng. `createPost` dùng unique `(author_id,idempotency_key)` với DO NOTHING rồi so payload chuẩn hóa; không merge hoặc SELECT trước INSERT. API chỉ lấy owner từ Auth guard.
+- Migration mới `20261116141312_t06_atomic_post_publish.sql` thêm trigger `posts_prepare_publish` và function `theou_private.prepare_post_publish()`. SECURITY INVOKER, search_path rỗng; REVOKE PUBLIC/anon/authenticated/service_role/supabase_auth_admin rồi chỉ GRANT EXECUTE cho service_role. Không public RPC/view hoặc policy mới, không mở raw tables cho client.
+- UPDATE publish có điều kiện id/author/DRAFT. Trigger chỉ chạy DRAFT → PUBLISHED, khóa SHARE profile tác giả trong statement, yêu cầu ACTIVE, lấy nickname tại thời điểm publish và gán clock_timestamp() tại DB. Anonymous luôn snapshot null. Retry trên PUBLISHED không UPDATE nên không đổi snapshot/thời gian. Không thay thế JWT/ownership guard; trigger không tự biết caller người dùng phía sau service-role.
+- CHECK T02 buộc NICKNAME có snapshot ngay cả DRAFT: create lưu nickname tạm từ profile đã guard, publish cập nhật lại snapshot trong DB. Draft không được getPost/listPosts trả ra. Bài có image row bị chặn publish trong giai đoạn text; T10 phải review lại trigger và quy tắc khóa khi thêm upload.
+- List/get chỉ đọc PUBLISHED, DTO allowlist 12 field, isMine tính tại server và hasUpvoted đọc vote của chính caller. Cursor ký HMAC chỉ chứa sort/tag/tuple bài/mốc đọc; không author ID/email. Secret cursor chỉ ở Edge, không dùng lại JWT/service-role key. Không có định danh tác giả xuyên bài anonymous.
+- Đây là kết quả local/PGlite, **chưa push migration hoặc deploy T06**. Khóa tranh chấp PostgreSQL Cloud, PostgREST embed/count/cache, hiệu năng HOT và tests A/B thật còn phải xác minh ở T06-B. Count/rate limit chưa có cơ chế cập nhật mới trong T06-A; không coi API foundation là đã nghiệm thu chống spam hoặc Prototype.
 
 ### Quyết định triển khai T02
 

@@ -1,4 +1,10 @@
-export type ErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'INTERNAL_ERROR'
+export type ErrorCode =
+  | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'INTERNAL_ERROR'
 
 const errors = {
   UNAUTHENTICATED: {
@@ -7,6 +13,11 @@ const errors = {
   },
   FORBIDDEN: { status: 403, message: 'Tài khoản không đủ điều kiện truy cập TheOU hoặc đã bị khóa.' },
   VALIDATION_ERROR: { status: 400, message: 'Yêu cầu không hợp lệ. Vui lòng kiểm tra và thử lại.' },
+  NOT_FOUND: { status: 404, message: 'Không tìm thấy nội dung hoặc bạn không được phép truy cập.' },
+  CONFLICT: {
+    status: 409,
+    message: 'Yêu cầu trùng với nội dung khác hoặc trạng thái bài đã thay đổi. Vui lòng tải lại.',
+  },
   INTERNAL_ERROR: { status: 500, message: 'Hệ thống tạm thời gặp sự cố. Vui lòng thử lại sau.' },
 } as const
 

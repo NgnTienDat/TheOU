@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getMe, getOrCreateProfile } from './modules/profile/get-me.ts'
 import { updateNickname } from './modules/profile/update-nickname.ts'
+import { createPost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
 import { authenticate } from './shared/authentication.ts'
 import { authorizeAccount } from './shared/authorization.ts'
 import { ApiError, failure, success } from './shared/response.ts'
@@ -10,6 +11,8 @@ interface Dependencies {
   createAuthClient: () => SupabaseClient
   createAdminClient: () => SupabaseClient
   allowedOrigins: string[]
+  readCursorSecret?: () => string
+  now?: () => number
 }
 
 export function createSocialApiHandler(deps: Dependencies) {
@@ -43,6 +46,28 @@ export function createSocialApiHandler(deps: Dependencies) {
       const isAdmin = await authorizeAccount(admin, user.id, profile)
       if (body.action === 'updateNickname') {
         return success(await updateNickname(admin, user.id, body.payload.nickname), requestId, headers)
+      }
+      const ctx = {
+        client: admin,
+        userId: user.id,
+        profile,
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),
+      }
+      if (body.action === 'createPost') {
+        return success(await createPost(ctx, body.payload), requestId, headers)
+      }
+      if (body.action === 'publishPost') {
+        return success(await publishPost(ctx, body.payload.postId), requestId, headers)
+      }
+      if (body.action === 'getPost') {
+        return success(await getPost(ctx, body.payload.postId), requestId, headers)
+      }
+      if (body.action === 'listPosts') {
+        return success(
+          await listPosts(ctx, body.payload, deps.readCursorSecret?.() ?? '', deps.now?.() ?? Date.now()),
+          requestId,
+          headers,
+        )
       }
       return success(getMe(user, profile, isAdmin), requestId, headers)
     } catch (error) {
