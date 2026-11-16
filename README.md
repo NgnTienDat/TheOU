@@ -2,9 +2,13 @@
 
 > **Ngôn ngữ làm việc: tiếng Việt.** Tên biến, tên bảng, tên hàm và giá trị enum sử dụng tiếng Anh để thuận tiện lập trình; nội dung sản phẩm, UI, tài liệu, task, PR và báo cáo kiểm thử ưu tiên tiếng Việt.
 
-**Phiên bản tài liệu:** 1.0 — 13/11/2026
+**Phiên bản tài liệu:** 1.1 — 15/11/2026
 
 **Trạng thái:** T01 đã có nền tảng frontend; T02 **COMPLETED** ngày 15/11/2026: migration/catalog Cloud đạt, offline 22/22 PASS, Cloud integration 8/8 PASS theo xác nhận chủ dự án; cleanup đã xác minh read-only. Xem [báo cáo T02](docs/reports/T02-STATUS-REPORT.md).
+
+**T03 — COMPLETED 16/11/2026:** đăng ký email OU + mật khẩu → OTP xác minh; đăng nhập mật khẩu, passwordless bị chặn phía server. Offline gần nhất 47/47 PASS; signup/OTP sau đổi settings được theo dõi tại T05 khi có OU account mới. Xem [nghiệm thu T03](docs/reports/T03-STATUS-REPORT.md).
+
+**T04-B đang kiểm thử:** chủ dự án đã deploy; getMe hai lần PASS. Runner đã tách handler/gateway, bỏ suy luận mọi Set-Cookie là tạo session và kiểm tra phiên ban đầu không đổi; typecheck và offline 87/87 PASS. Chờ chạy lại Cloud, T04 chưa COMPLETED. Xem [T04-A](docs/reports/T04-A-IMPLEMENTATION.md), [runner T04-B.1](docs/reports/T04-B1-RUNNER.md).
 **Sản phẩm:** Mạng xã hội độc lập cho cộng đồng sở hữu email OU; không đại diện hay được bảo trợ bởi Trường Đại học Mở TP.HCM.
 
 ## Cấu trúc repository và chạy frontend
@@ -12,7 +16,7 @@
 ```text
 TheOU/
 ├── frontend/    # React + Vite + TypeScript, cấu hình và test frontend
-├── supabase/    # Migration T02, test DB và config.toml; functions/ còn giữ chỗ
+├── supabase/    # Migrations T02/T03, tests DB/Auth/API, Edge Function social-api
 ├── docs/        # 7 tài liệu đặc tả tiếng Việt
 ├── .github/     # CI kiểm tra frontend
 ├── .gitignore
@@ -28,7 +32,7 @@ Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/se
 
 | Mốc | Thời gian | Kết quả phải có |
 |---|---|---|
-| **Prototype** | Tuần 1–2 | Hai tài khoản OU dùng được luồng OTP → bảng tin → đăng ẩn danh → bình luận/upvote → phản hồi với nhãn Chủ bài; có tag, ảnh và công cụ admin gỡ nội dung tối thiểu; chạy online trong nhóm test khép kín. |
+| **Prototype** | Tuần 1–2 | Hai tài khoản OU đăng ký mật khẩu, xác minh OTP rồi đăng nhập mật khẩu → bảng tin → đăng ẩn danh → bình luận/upvote → phản hồi với nhãn Chủ bài; có tag, ảnh và công cụ admin gỡ nội dung tối thiểu; chạy online trong nhóm test khép kín. |
 | **MVP beta** | Tuần 3–4 | Hoàn thiện report, kiểm duyệt, chống spam/rate limit, bảo mật và trải nghiệm mobile; mở thử nghiệm giới hạn sau khi vượt kiểm thử. |
 
 **Không thuộc phạm vi 4 tuần:** kết bạn, theo dõi, nhắn tin nội bộ, thông báo push, video, AI recommendation, marketplace có giỏ hàng/thanh toán, tìm kiếm full-text, dashboard phân tích phức tạp, app native.
@@ -56,7 +60,7 @@ Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/se
 
 - Frontend: **React + Vite + TypeScript + Tailwind CSS**, React Router, TanStack Query.
 - Backend giai đoạn đầu: **Supabase Auth + PostgreSQL + Storage + Edge Functions**. Chưa có NestJS/Spring Boot riêng.
-- Email: OTP qua `@ou.edu.vn`, xác minh domain ở server; phải cấu hình nhà cung cấp email trước khi chạy beta.
+- Auth: đăng ký email `@ou.edu.vn` + mật khẩu, OTP 6 số xác minh đăng ký; đăng nhập email + mật khẩu, không OTP. Xác minh domain ở server; phải cấu hình nhà cung cấp email trước beta.
 - Feed: một luồng chung, 2 cách sắp xếp **Mới nhất / Nổi bật 24h**, 5 tag cố định.
 - Nội dung: text tối đa **1.000 ký tự**, tối đa **2 ảnh**, mỗi ảnh tối đa **2 MiB** sau xử lý.
 - Tương tác: **upvote, không downvote** trong MVP; không tự ẩn chỉ vì nhiều report.
@@ -66,7 +70,8 @@ Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/se
 ## Tham khảo kỹ thuật chính (đối chiếu ngày 13/11/2026)
 
 - Email OU: https://docs.ou.edu.vn/books/huong-dan-sinh-vien-su-dung-cac-dich-vu-tien-ich/page/thong-tin-cac-loai-tai-khoan-danh-cho-sinh-vien
-- Supabase email OTP: https://supabase.com/docs/guides/auth/auth-email-passwordless
+- Supabase email/password: https://supabase.com/docs/guides/auth/passwords
+- Template OTP xác minh signup: https://supabase.com/docs/guides/auth/auth-email-templates
 - Before User Created Hook: https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook
 - SMTP: https://supabase.com/docs/guides/auth/auth-smtp
 - Edge Function auth: https://supabase.com/docs/guides/functions/auth

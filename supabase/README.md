@@ -1,12 +1,49 @@
-# TheOU — T02 Database Schema & Security
+# TheOU — Supabase Database, Auth và Social API
+
+## T04-A — Social API local, chờ review
+
+**Trạng thái mới nhất:** chủ dự án đã deploy social-api, getMe hai lần PASS. Runner đã sửa allowlist JWT cho body code chuỗi/sb-error-code, kiểm tra header/body và session không đổi; offline 82/82 PASS. Chạy lại `npm.cmd run auth:manual -- get-me`, không cần redeploy cho sửa runner. Xem mục cuối [báo cáo T04-B.1](../docs/reports/T04-B1-RUNNER.md); phần T04-A/B.1 dưới đây là snapshot trước deployment.
+
+`functions/social-api/` có guard JWT/OU/confirmed/ACTIVE, error wrapper, CORS và duy nhất action `getMe`. Chưa deploy hoặc gọi Edge trên Cloud; không có migration mới. Xem [bàn giao T04-A](../docs/reports/T04-A-IMPLEMENTATION.md) để review kiến trúc, kết quả tests và checklist T04-B.
+
+Trong thư mục `supabase/`:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd test
+# Có Deno 2.9.6 trên PATH:
+npm.cmd run typecheck:edge
+npm.cmd run lint:edge
+deno fmt --check --config functions/social-api/deno.json functions/social-api
+```
+
+Nếu chưa cài Deno, thay `deno` bằng `npx.cmd --yes deno@2.9.6` để chạy công cụ tạm qua npm cache; không thêm dependency dự án. `deno.json` pin cùng SDK 2.119.0 đang có; `deno.lock` khóa dependency của runtime Edge. Tests Node chạy HTTP handler bằng Request/Response và SDK với fetch giả lập, không kết nối Cloud.
+
+Edge đọc `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` do Cloud cung cấp. Cấu hình thêm `THEOU_PUBLISHABLE_KEY` và `THEOU_ALLOWED_ORIGINS` theo `functions/.env.example` khi T04-B được phê duyệt; không tự đọc `.env.auth.local`/`.env.test.local`, không đẩy các file đó thành Edge secrets. Key đặc quyền chỉ dùng trong client DB riêng sau bước xác minh Auth/email. Giữ `verify_jwt = true`, không dùng `--no-verify-jwt`. Không push toàn bộ `config.toml`: phần Auth local vẫn là scaffold khác Cloud.
+
+## T04-B.1 — Manual runner get-me (local, chờ review)
+
+Đã thêm mode `get-me` dùng cùng `.env.auth.local`, guard TheOU-dev, publishable client và nhập email/password ẩn của T03. **Sau review, cấu hình secrets và deploy riêng**, chủ dự án chạy từ supabase/:
+
+```powershell
+npm.cmd run auth:manual -- get-me
+```
+
+Mode đăng nhập account OU đã có, kiểm tra getMe/DTO/nickname hai lần, thiếu/sai JWT và validation lỗi, rồi luôn logout/session null. Handler UNAUTHENTICATED/401 không cần top-level code hoặc sb-error-code; gateway dùng allowlist và kiểm tra header/body phù hợp request. Malformed payload/action lạ phải VALIDATION_ERROR/400. Negative requests thiếu/sai JWT dùng fetch riêng, credentials=omit, không nhận token thật từ SDK; session/token/user ID ban đầu phải giữ nguyên. Không suy ra có session chỉ từ Set-Cookie. Không in raw response/identity/token. Lần gọi đầu có thể tạo profile; runner giữ profile, không tạo/xóa user hoặc sửa status/role. Sau sửa regression, typecheck và 87/87 offline tests PASS; chưa chạy lại Cloud. Xem [bàn giao T04-B.1](../docs/reports/T04-B1-RUNNER.md).
+
+## T04-B.7 — Runner Cloud BANNED/ADMIN và concurrent profile
+
+Đã chuẩn bị `npm.cmd run test:t04-cloud`, dùng `.env.test.local` và cờ riêng `THEOU_ALLOW_T04_CLOUD_TESTS=theou-dev`, tái sử dụng URL/ref/publishable/secret key T02. Không phụ thuộc Gmail hoặc cờ T02; không tắt hook OU. Runner tạo ba Auth fixture OU bằng Admin API, kiểm tra BANNED/ADMIN bằng cùng JWT và 10 getMe đồng thời, rồi cleanup đúng UUID và đối chiếu baseline. Chưa chạy Cloud; chỉ chạy sau review. Manifest recovery local được gitignore; khi lỗi, dùng `npm.cmd run test:t04-cloud -- --cleanup <runId>` theo [hướng dẫn B.7](../docs/reports/T04-B7-SECURITY-TEST.md). Typecheck và 99/99 offline tests PASS; không sửa source Edge hoặc migrations.
+
+## T02 — Database Schema & Security
 
 **Trạng thái 15/11/2026: T02 COMPLETED.** Migration/catalog đạt, offline 22/22 PASS; chủ dự án xác nhận Cloud integration 8/8 PASS, 0 FAIL. Cleanup đã xác minh read-only: không còn Auth users/identities T02, chín bảng rỗng. Xem [báo cáo nghiệm thu](../docs/reports/T02-STATUS-REPORT.md).
 
-T02 thuộc W1/Prototype, làm nền tảng cho US-02–US-10 và cấu trúc dữ liệu US-11–US-13. Không có Authentication UI, Edge Function nghiệp vụ, schema tạo thủ công trên Dashboard, Docker hoặc Supabase Local Stack.
+T02 thuộc W1/Prototype, làm nền tảng cho US-02–US-10 và cấu trúc dữ liệu US-11–US-13. T02 không triển khai Authentication UI hoặc Edge Function nghiệp vụ; T04-A thêm foundation Edge local. Không dùng Docker/Supabase Local Stack hoặc tạo schema thủ công trên Dashboard.
 
-## T03-A — Điều chỉnh Authentication Flow (chờ review)
+## T03 — Authentication Foundation (COMPLETED)
 
-**Yêu cầu mới 15/11/2026:** đăng ký email OU + mật khẩu → OTP 6 số xác minh email; đăng nhập email + mật khẩu, không yêu cầu OTP. Quên/đổi mật khẩu chưa triển khai trong T03. Giữ nguyên T02 và migration hook `20261115050213_t03_before_user_created_hook.sql` đã triển khai Cloud theo xác nhận chủ dự án; lượt này không sửa hoặc truy cập Cloud.
+**Nghiệm thu 16/11/2026:** đăng ký email OU + mật khẩu → OTP 6 số xác minh email; đăng nhập email + mật khẩu, không yêu cầu OTP. Passwordless server-side và password login regression đã PASS theo chủ dự án; signup/OTP regression sau đổi settings chuyển T05 khi có OU account mới. Quên/đổi mật khẩu chưa thuộc T03. Giữ nguyên T02 và migration hook `20261115050213_t03_before_user_created_hook.sql` đã triển khai Cloud. Xem [nghiệm thu T03](../docs/reports/T03-STATUS-REPORT.md).
 
 Template `templates/email-otp.html` chỉ dùng cho **Confirm signup**, subject `Xác minh đăng ký TheOU`, OTP 6 số/600 giây. Không còn hướng dẫn dùng template này cho Magic Link. Confirm email phải bật; SMTP, template và chính sách mật khẩu cần được chủ dự án kiểm tra trên Dashboard sau review, không tự đồng bộ `config.toml`.
 
@@ -29,11 +66,11 @@ npm.cmd run auth:manual -- passwordless-denied
 
 `passwordless-denied` nhập ẩn **cùng email OU đã đăng nhập password thành công**, không hỏi password/OTP. Dùng publishable key đã được guard kiểm tra, gọi trực tiếp `signInWithOtp({ email, options: { shouldCreateUser: false } })`. PASS với `otp_disabled` (loại trường hợp `Signups not allowed for otp`) hoặc `email_provider_disabled` kèm đúng thông báo `Login with magic link is disabled`; phải HTTP 4xx trừ 429 và không session trước/sau. Supabase dùng chung email_provider_disabled cho tắt Email provider và tắt riêng Magic Link, nên không chấp nhận chỉ code/422 hoặc thông báo chung. Xem [nhánh MagicLink chính thức](https://github.com/supabase/auth/blob/master/internal/api/magic_link.go). SMTP/mạng/rate limit, tắt Email provider chung và user không tồn tại không đạt. Người chạy xác nhận account trước; runner không dùng admin, không tạo user hoặc đổi settings. Nếu passwordless thực tế chưa tắt, request có thể gửi thư và sẽ FAIL; dừng, không nhập OTP hoặc thử liên tục.
 
-Sau sửa nhận diện lỗi MagicLink, typecheck và **47/47 offline tests PASS**. Lần Cloud trước trả email_provider_disabled/422, runner cũ chỉ chấp nhận otp_disabled nên FAIL; chưa xác nhận chính xác nhánh lỗi vì không in raw message. Chẩn đoán mới có `magicLinkDisabled=true` chỉ khi thông báo khớp nhánh tắt riêng Magic Link. Không in response thô/email/token; code lạ/thiếu hiển thị unknown_or_missing. Agent chỉ GET settings, xác nhận Email provider chung vẫn bật; không gọi lại OTP. T03 chờ chủ dự án chạy lại runner đã sửa và xác nhận signup/password không bị ảnh hưởng. Xem [báo cáo trạng thái](../docs/reports/T03-STATUS-REPORT.md). Kết quả kỳ vọng cuối cùng: `PASS: hoàn tất kiểm tra passwordless-denied.`
+Sau sửa nhận diện lỗi MagicLink, typecheck và **47/47 offline tests T03 PASS**. Chủ dự án đã cung cấp log `magicLinkDisabled=true`, email_provider_disabled/422, không session và PASS toàn mode; password login regression cũng PASS trên cấu hình hiện tại. Không suy ra toàn bộ Email Provider bị tắt từ mã lỗi chung. Không in response thô/email/token; code lạ/thiếu hiển thị unknown_or_missing. Signup/OTP chưa kiểm thử lại sau đổi settings; theo dõi tại T05.
 
 Một OU account đủ cho luồng mới, nhưng account đã tạo bằng OTP trước đây có thể chưa có mật khẩu. Không dùng đăng ký lại để đặt mật khẩu, tự xóa account hoặc tự thêm luồng reset/updateUser; cần quyết định chuyển đổi riêng trước T03-B. Mode `login-existing` và `wrong-otp` cũ được thay bằng các lệnh phía trên. Đọc [T03-A Implementation](../docs/reports/T03-A-IMPLEMENTATION.md) để xem tiền điều kiện, kết quả kỳ vọng và điểm dừng khi có lỗi.
 
-Sau khi bật hook, giữ `THEOU_OU_HOOK_ENABLED=true` trong `.env.test.local`: runner T02 dừng trước API. Đây là khai báo vận hành, không tự truy vấn Dashboard. Không dùng Admin API/Gmail T02 làm bằng chứng domain, không tắt hook để chạy lại test. Typecheck và **41/41 offline tests PASS** sau đổi flow; chưa kiểm thử Cloud luồng mật khẩu. Kết quả Gmail reject của runner OTP cũ là lịch sử, chưa thay thế test `signUp` mới.
+Sau khi bật hook, giữ `THEOU_OU_HOOK_ENABLED=true` trong `.env.test.local`: runner T02 dừng trước API. Đây là khai báo vận hành, không tự truy vấn Dashboard. Không dùng Admin API/Gmail T02 làm bằng chứng domain, không tắt hook để chạy lại test. Kết quả 41/41 sau đổi flow và Gmail reject của runner OTP cũ là lịch sử; nghiệm thu mới nhất ở báo cáo T03.
 
 ## Project và phạm vi migration
 
@@ -118,7 +155,7 @@ Chủ dự án xác nhận lần chạy sau sửa fixture đạt 8/8 PASS, 0 FAI
 
 **Giới hạn:** dọn dữ liệu là best effort nếu mất mạng/process bị kill hoặc schema sai; test báo lỗi nếu cleanup thất bại. Không tự nới grants để cleanup. Nếu xảy ra, review các Auth user theo runId trong alias và xóa dữ liệu test có phạm vi sau khi được duyệt; bộ lọc `.invalid` trong các báo cáo cũ chỉ áp dụng lượt test cũ. Sau T03, không dùng suite Admin API/Gmail để nghiệm thu domain: đường Admin có thể không gọi hook. Runner có chốt khai báo trạng thái hook để dừng; xem hướng dẫn T03-A, không tắt hook hoặc giả JWT.
 
-Ownership qua `social-api`, public DTO khi đọc nhiều bài ẩn danh, OP, user BANNED/email ngoài OU, atomic counts, idempotent response và signed Storage thuộc T04/T06/T08–T11/T16. Những ca này **chưa có triển khai API để kiểm thử**, không được gắn nhãn pass khi test DB đạt.
+T04-A đã có guard/getMe và tests HTTP offline cho BANNED/email ngoài OU; chưa kiểm thử Edge Cloud. Ownership nội dung, DTO khi đọc nhiều bài ẩn danh, OP, atomic counts, idempotent response và signed Storage thuộc T06/T08–T11/T16; chưa có API tương ứng, không được gắn nhãn pass khi test DB đạt.
 
 ## Giai đoạn B — chỉ sau phê duyệt của chủ dự án
 

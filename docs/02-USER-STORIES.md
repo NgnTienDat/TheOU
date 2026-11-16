@@ -4,16 +4,21 @@
 
 ## Nhóm A — Xác thực và hồ sơ
 
-### US-01 — Đăng nhập bằng email OU (P0-P)
-**Là** người có email OU, **tôi muốn** nhận mã OTP qua email **để** vào cộng đồng mà không phải tạo mật khẩu.
+### US-01 — Đăng ký và đăng nhập bằng email OU, mật khẩu (P0-P)
+**Là** người có email OU, **tôi muốn** đăng ký bằng email và mật khẩu, xác minh email một lần bằng OTP **để** đăng nhập những lần sau bằng mật khẩu, không cần OTP.
 
-- **AC01:** Form chỉ cho nhập email, trim + lowercase; không chấp nhận chuỗi không đúng cú pháp.
-- **AC02:** Khi yêu cầu OTP cho domain ngoài `@ou.edu.vn`, frontend từ chối; **server/hook cũng từ chối** nếu cố gọi trực tiếp API Auth.
-- **AC03:** OTP là 6 chữ số; nhập đúng mã còn hiệu lực tạo phiên đăng nhập, điều hướng vào feed.
-- **AC04:** OTP sai/hết hạn có thông báo tiếng Việt, không đăng nhập; có thể yêu cầu lại theo cooldown.
-- **AC05:** Không lưu OTP trong app DB/log; màn hình không in đầy đủ email trên feed.
-- **AC06:** Sinh viên logout thì route và social API được bảo vệ.
-- **AC07:** Tài khoản `BANNED` không dùng được social API kể cả khi JWT còn hiệu lực.
+**Yêu cầu cập nhật 15/11/2026:** thay thế luồng đăng nhập không mật khẩu trước đây.
+
+- **AC01:** Form đăng ký có email, mật khẩu và nhập lại mật khẩu. Email trim + lowercase; mật khẩu nhập ẩn, giữ nguyên khoảng trắng, tối thiểu 8 ký tự và tối đa 72 byte UTF-8. Server thực thi chính sách, không chỉ form.
+- **AC02:** Đăng ký domain ngoài chính xác `@ou.edu.vn` bị frontend từ chối; **Before User Created Hook cũng từ chối** khi gọi trực tiếp `signUp` bằng Gmail. Không có ngoại lệ Gmail cho test.
+- **AC03:** `signUp` chưa cấp session khi bật Confirm email; tài khoản chưa xác minh không đăng nhập được bằng đúng mật khẩu.
+- **AC04:** Confirm signup gửi OTP 6 chữ số, hạn 10 phút. `verifyOtp` với mã đúng xác minh email và tạo phiên; mã sai/hết hạn không xác minh hoặc tạo session. Có gửi lại theo cooldown tối thiểu 60 giây, không đăng ký lặp để đặt lại mật khẩu.
+- **AC05:** Đăng nhập dùng email + mật khẩu qua `signInWithPassword`, không gọi gửi OTP. Tài khoản OU đã xác minh có session hợp lệ thì vào ứng dụng; nickname/onboarding theo US-02.
+- **AC06:** Mật khẩu sai hoặc tài khoản không tồn tại dùng thông báo chung, không tạo session. Tài khoản chưa xác minh được hướng dẫn hoàn tất xác minh đăng ký.
+- **AC07:** Không ghi mật khẩu, OTP, JWT vào source, file, log/analytics hoặc app DB; không đưa chúng vào URL. Email không xuất hiện trên feed.
+- **AC08:** Logout dọn session phía app; route và social API vẫn yêu cầu phiên hợp lệ. Không tuyên bố access token cũ mất hiệu lực ngay lập tức.
+- **AC09:** Tài khoản `BANNED`, email ngoài OU hoặc chưa xác minh không dùng được social API kể cả khi có JWT.
+- **AC10:** Quên/đổi mật khẩu chưa triển khai trong T03. Tài khoản OTP cũ chưa có mật khẩu cần quyết định chuyển đổi riêng, không tự xóa hoặc dùng đăng ký lại để thay mật khẩu.
 
 ### US-02 — Tạo biệt danh (P0-P)
 - Lần đầu vào ứng dụng, hệ thống cấp biệt danh mặc định an toàn kiểu `OUer-1234`; có thể sửa trong màn hình cá nhân nhỏ.
@@ -122,6 +127,9 @@
 | Tình huống | Prototype | MVP |
 |---|---:|---:|
 | Email ngoài OU bị từ chối server-side | ✓ | ✓ |
+| Đăng ký chưa xác minh không có session, không đăng nhập được bằng mật khẩu | ✓ | ✓ |
+| OTP đăng ký sai/hết hạn không xác minh; OTP đúng xác minh email | ✓ | ✓ |
+| Đăng nhập đúng mật khẩu không yêu cầu OTP; sai mật khẩu không có session | ✓ | ✓ |
 | JWT không hợp lệ / hết hạn không đọc feed | ✓ | ✓ |
 | A không xóa được bài B | ✓ | ✓ |
 | A đọc ẩn danh của B không nhận `author_id`/email/MSSV | ✓ | ✓ |

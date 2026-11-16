@@ -4,6 +4,10 @@
 
 **T02 — COMPLETED (15/11/2026):** migration `supabase/migrations/20261113170214_t02_schema_security.sql` đã áp dụng trên TheOU-dev; catalog đạt, offline 22/22 PASS, Cloud 8/8 PASS theo xác nhận chủ dự án và cleanup đã xác minh read-only. Timestamp tên file do CLI sinh theo UTC. Xem [báo cáo nghiệm thu](reports/T02-STATUS-REPORT.md); các phần nghiệp vụ/API bên dưới vẫn thuộc task tiếp theo.
 
+**T03 — COMPLETED 16/11/2026:** giữ nguyên `20261115050213_t03_before_user_created_hook.sql` đã triển khai Cloud. Function `theou_private.before_user_created(jsonb)` chỉ cho domain chính xác ou.edu.vn, SECURITY INVOKER/search_path rỗng; supabase_auth_admin có EXECUTE/USAGE, không thêm quyền bảng. Đăng ký email + mật khẩu rồi OTP xác minh; đăng nhập mật khẩu, passwordless bị chặn ở server. Mật khẩu chỉ được Auth lưu hash, không lưu trong profiles/bảng nghiệp vụ. Confirm email bật; T04 kiểm tra email đã xác minh/OU/ACTIVE trên mỗi request. Hook không chặn Admin API/account ngoài OU đã có sẵn, không có Gmail exception. Chưa làm quên/đổi mật khẩu. Signup/OTP regression sau đổi settings chuyển T05; xem [nghiệm thu T03](reports/T03-STATUS-REPORT.md).
+
+**T04-A — source local, chưa deploy:** guard xác minh bằng Auth server, chỉ dùng ID/email đã xác minh từ Auth. Client đặc quyền đọc `profiles` và `user_roles` để kiểm tra ACTIVE/ADMIN; mỗi truy vấn filter theo ID chính chủ, không lấy quyền từ metadata/payload. Khởi tạo profile dùng INSERT ON CONFLICT DO NOTHING rồi đọc lại, không UPDATE trạng thái/nickname hoặc role. Không sửa migration/grants/RLS T02; không có migration mới. `getMe` chỉ trả nickname, email che toàn bộ local part (`***@ou.edu.vn`) và boolean isAdmin. Các request đang xử lý không được khóa cùng thao tác ban; request sau phải đọc trạng thái mới, không cache authorization.
+
 ### Quyết định triển khai T02
 
 - Dùng UUID, `timestamptz`, `text + CHECK` cho trạng thái/tag; 9 bảng đúng đặc tả, kể cả cấu trúc `reports` để chuẩn bị W3. Chưa có API report, bucket Storage, trigger tạo profile Auth hoặc logic kiểm duyệt/rate limit.
@@ -121,7 +125,7 @@ Không tạo index tràn lan trước khi đo query thực tế.
 2. Quan hệ: không trả profile ID hoặc author token ổn định để nối bài ẩn danh với nhau.
 3. Comment: khi chủ bài bình luận, chỉ có nhãn `Chủ bài`; không có nickname/ID tài khoản trong response.
 4. Media: đường dẫn object không chứa email, MSSV hoặc UUID của tác giả. Ảnh được loại EXIF/GPS khi xử lý trước upload; cần kiểm tra thực tế.
-5. Log: không log JWT, OTP, nội dung nhạy cảm; che email và IP khi không cần lưu.
+5. Log: không log mật khẩu, JWT, OTP, nội dung nhạy cảm; che email và IP khi không cần lưu.
 6. Client: không nhận row database nguyên gốc rồi xóa trường bằng JavaScript; server chỉ chọn trường được phép trả.
 
 **Giới hạn phải công bố:** tính ẩn danh áp dụng trước cộng đồng, không phải trước quản trị viên có thẩm quyền hay nhà cung cấp hạ tầng; người viết vẫn có thể tự tiết lộ danh tính qua nội dung/hình ảnh; signed URL có thể được chia sẻ trong thời hạn hiệu lực.
@@ -162,7 +166,7 @@ Không tạo index tràn lan trước khi đo query thực tế.
 ## 7. Kiểm thử DB/authorization (không thể bỏ)
 
 - `anon` gọi Data API `public.posts` → bị từ chối.
-- `authenticated` gọi trực tiếp Data API `public.posts`/`public.profiles` → bị từ chối, dù đã có OTP.
+- `authenticated` gọi trực tiếp Data API `public.posts`/`public.profiles` → bị từ chối, dù đã xác minh email và đăng nhập bằng mật khẩu.
 - JWT email không hợp lệ, user banned → `social-api` trả 403.
 - B sở hữu JWT hợp lệ nhưng gửi `postId` của A trong thao tác xóa → 403.
 - B xem bài ẩn danh của A → không có identity trong JSON, ảnh URL, logs trả về.

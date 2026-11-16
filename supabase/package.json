@@ -7,8 +7,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "typecheck:edge": "deno check --frozen --config functions/social-api/deno.json functions/social-api/index.ts",
+    "lint:edge": "deno lint --config functions/social-api/deno.json functions/social-api",
     "test": "node --test tests/*.test.ts",
     "test:cloud": "node --env-file=.env.test.local --test tests/cloud.integration.ts",
+    "test:t04-cloud": "node --env-file=.env.test.local scripts/t04-cloud.ts",
     "auth:manual": "node --env-file=.env.auth.local scripts/auth-manual.ts"
   },
   "devDependencies": {

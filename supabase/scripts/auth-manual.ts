@@ -4,6 +4,7 @@ import { Writable } from 'node:stream'
 import { createClient } from '@supabase/supabase-js'
 import { ManualAuthError, readManualAuthConfig } from './auth-helpers.ts'
 import { manualAuthModes, runManualAuth, type ManualAuthMode } from './auth-manual-flow.ts'
+import { runGetMeChecks } from './social-api-manual.ts'
 
 try {
   const mode = process.argv[2]
@@ -27,7 +28,8 @@ try {
       process.stdout.write(prompt)
       try { return await input.question('') }
       finally { process.stdout.write('\n') }
-    }, message => process.stdout.write(`${message}\n`))
+    }, message => process.stdout.write(`${message}\n`), identity =>
+      runGetMeChecks(client, config, identity, message => process.stdout.write(`${message}\n`)))
   } finally { input.close() }
 } catch (error) {
   process.stderr.write(`${error instanceof ManualAuthError ? error.message : 'Không khởi chạy được manual test. Kiểm tra file env, CLI link và terminal; không in lỗi thô.'}\n`)

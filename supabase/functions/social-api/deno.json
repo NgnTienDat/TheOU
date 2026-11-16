@@ -1,0 +1,15 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.119.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "fmt": {
+    "semiColons": false,
+    "singleQuote": true,
+    "lineWidth": 110
+  }
+}

@@ -1,6 +1,8 @@
 # Supabase
 .branches
 .temp
+# Manifest recovery T04 chỉ lưu local, kể cả khi Git ignore cha thay đổi.
+.temp/t04-cloud/
 
 # dotenvx
 .env.keys

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { createRejectionEmail, domainRejectionMessage, isOuEmail, normalizeOuEmail, parseOtp, parsePassword, readManualAuthConfig } from '../scripts/auth-helpers.ts'
-import { runManualAuth, type ManualAuthClient } from '../scripts/auth-manual-flow.ts'
+import { manualAuthModes, runManualAuth, type ManualAuthClient } from '../scripts/auth-manual-flow.ts'
 
 const ref = 'puhkisyehspcmgzerutm'
 const env = {
@@ -282,6 +282,62 @@ test('login: mật khẩu sai bị chặn rồi mật khẩu đúng tạo sessio
   assert.equal(f.state.active, false)
   assert.match(f.logs.join('\n'), /không yêu cầu OTP/)
   assertSafeLogs(f)
+})
+
+test('get-me tái sử dụng login/OU confirmed, giữ JWT trong bộ nhớ rồi logout/session null', async () => {
+  const f = fixture()
+  f.state.registered = f.state.confirmed = true
+  f.answers.splice(0, f.answers.length, f.user.email, f.password)
+  assert.ok(manualAuthModes.includes('get-me'))
+  let checked = false
+  await runManualAuth(f.client, 'get-me', f.ask, f.report, async identity => {
+    assert.deepEqual(identity, { userId: f.user.id, email: f.user.email, accessToken: f.session.access_token })
+    assert.equal(f.state.active, true)
+    checked = true
+  })
+  assert.equal(checked, true)
+  assert.deepEqual(f.calls.map(call => call.method), ['password', 'logout'])
+  assert.equal(f.state.active, false)
+  assert.match(f.logs.join('\n'), /hoàn tất kiểm tra get-me/)
+  assertSafeLogs(f)
+})
+
+test('get-me: Edge thất bại hoặc cleanup lỗi không được in PASS toàn mode', async () => {
+  for (const failLogout of [false, true]) {
+    const f = fixture()
+    f.state.registered = f.state.confirmed = true
+    f.state.failLogout = failLogout
+    f.answers.splice(0, f.answers.length, f.user.email, f.password)
+    await assert.rejects(runManualAuth(f.client, 'get-me', f.ask, f.report, async () => {
+      if (!failLogout) throw new Error(`${f.user.email} ${f.password} ${f.session.access_token}`)
+    }), /kết nối hoặc SDK|Đăng xuất/)
+    assert.equal(f.calls.at(-1)?.method, 'logout')
+    assert.equal(f.logs.some(line => line.includes('hoàn tất kiểm tra')), false)
+    assertSafeLogs(f)
+  }
+})
+
+test('get-me: input/Auth/session không hợp lệ hoặc thiếu checker dừng trước Edge', async () => {
+  for (const change of ['email', 'password', 'unconfirmed', 'wrong-password', 'getUser', 'stored-token', 'checker']) {
+    const f = fixture()
+    f.state.registered = f.state.confirmed = true
+    f.answers.splice(0, f.answers.length, f.user.email, f.password)
+    if (change === 'email') f.answers[0] = 'outside@gmail.com'
+    if (change === 'password') f.answers[1] = ''
+    if (change === 'wrong-password') f.answers[1] = 'wrong-password'
+    if (change === 'unconfirmed') f.state.confirmed = false
+    if (change === 'getUser') f.client.getUser = async () => ({ error: null, data: { user: { ...f.user, id: 'other-id' } } })
+    if (change === 'stored-token') f.client.getSession = async () => ({ error: null,
+      data: { session: f.state.active ? { ...f.session, access_token: 'other-token' } : null } })
+    let calls = 0
+    await assert.rejects(runManualAuth(f.client, 'get-me', f.ask, f.report,
+      change === 'checker' ? undefined : async () => { calls++ }))
+    assert.equal(calls, 0)
+    assert.equal(f.state.active, false)
+    assert.equal(f.calls.at(-1)?.method, 'logout')
+    assert.equal(f.calls.some(call => ['signup', 'verify', 'otp-send'].includes(call.method)), false)
+    assertSafeLogs(f)
+  }
 })
 
 test('signup không đạt nếu Confirm email tắt hoặc email đã có tài khoản được xác minh', async () => {

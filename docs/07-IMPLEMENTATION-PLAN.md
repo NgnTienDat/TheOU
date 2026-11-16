@@ -19,19 +19,29 @@
 |---|---|---|---|
 | T01 | Tạo Vite React TS, Tailwind, Router, TanStack Query, lint/test | — | CI chạy typecheck/build |
 | T02 | Supabase Cloud Development TheOU-dev, migration schema + RLS/grants | T01 | **COMPLETED 15/11/2026:** migration/catalog đạt; offline 22/22, Cloud 8/8 PASS; cleanup đã xác minh |
-| T03 | Cấu hình Auth OTP, email template, SMTP và Before User Created Hook OU | T02 | Email đúng nhận mã; email ngoài OU bị chặn server-side |
-| T04 | Xây `social-api` auth guard, error wrapper, `getMe` | T02,T03 | JWT lỗi/banned bị từ chối |
-| T05 | UI đăng nhập/OTP, route guard, profile nickname | T03,T04 | Hoàn thành onboarding bằng OU account |
+| T03 | Đăng ký email OU + mật khẩu, OTP xác minh signup; đăng nhập mật khẩu; SMTP và hook OU | T02 | **COMPLETED 16/11/2026:** offline 47/47 PASS; chủ dự án xác nhận passwordless denied và password login regression PASS sau đổi settings. Signup/OTP đã PASS trước đó; regression sau đổi settings chuyển T05 khi có OU account mới. Xem [báo cáo T03](reports/T03-STATUS-REPORT.md) |
+| T04 | Xây `social-api` auth guard, error wrapper, `getMe` | T02,T03 | **T04-B đang kiểm thử:** đã deploy theo chủ dự án, getMe hai lần PASS. Runner tách handler/gateway, bỏ false positive Set-Cookie và kiểm tra phiên không đổi; typecheck, 87/87 offline PASS. Chờ chạy lại Cloud, chưa COMPLETED. Xem [T04-A](reports/T04-A-IMPLEMENTATION.md), [runner](reports/T04-B1-RUNNER.md) |
+| T05 | UI đăng ký/mật khẩu, OTP xác minh signup, đăng nhập mật khẩu, route guard, nickname | T03,T04 | Hoàn thành onboarding bằng OU account đã xác minh; login không gửi OTP. Khi có OU account mới, regression signup + OTP verification với passwordless đã tắt; mục chuyển tiếp từ T03, chưa thực hiện |
 | T06 | `createPost` draft, `publishPost`, `listPosts`, `getPost` text | T04 | A đăng ẩn danh, B thấy bài, không lộ author ID |
 | T07 | Feed mobile-first, tab mới/nổi bật, tag, composer text | T06 | Đọc và đăng bài text E2E |
 
 **Gate W1:** 2 email OU có thể đăng nhập, A đăng text ẩn danh, B đọc feed; thử request trực tiếp không có JWT và direct DB access bị chặn. Chỉ chuyển W2 sau khi chứng minh dữ liệu identity không rò rỉ qua DTO.
+
+**T04-B.7 (16/11/2026):** chủ dự án xác nhận smoke T04-B PASS và yêu cầu thêm BANNED/ADMIN/concurrent initialization trên PostgreSQL Cloud trước nghiệm thu. Đã chuẩn bị runner riêng, flag dev, ba fixture OU và cleanup/recovery theo UUID; typecheck, 99/99 offline tests PASS. **Chưa chạy Cloud B.7, T04 chưa COMPLETED**; xem [hướng dẫn review/chạy/cleanup](reports/T04-B7-SECURITY-TEST.md). Không thay đổi migration hoặc source social-api.
 
 **Kiểm tra T01 tại máy (13/11/2026):** `lint`, `typecheck`, `test` (6 test cấu hình môi trường), `build` đều thành công. Dev server khởi động và trả HTTP 200 cho HTML và các module chính. Đã kiểm tra Git bỏ qua env riêng và quét các file tracked/unignored tìm credentials. Chưa chạy CI trên GitHub, chưa kiểm thử giao diện bằng trình duyệt hoặc kết nối Supabase thật. `npm audit` báo 10 cảnh báo moderate trong chuỗi công cụ ESLint/TypeScript ESLint liên quan `minimatch`; chưa áp dụng downgrade/major change tự động. T01 không chứng minh gate W1 hay các user story nghiệp vụ đã hoàn thành. Task tiếp theo: **T02 — schema, RLS/grants và test quyền truy cập**.
 
 ### W2 — Tương tác, ảnh, công cụ admin, nghiệm thu Prototype
 
 **Trạng thái T02 (15/11/2026): COMPLETED.** Đã áp dụng migration `20261113170214_t02_schema_security.sql` đúng bản duyệt trên TheOU-dev, catalog đạt; offline 22/22 PASS, Cloud integration 8/8 PASS theo xác nhận chủ dự án. Kiểm tra read-only sau test: Auth users/identities T02 = 0, chín bảng nghiệp vụ đều rỗng. Xem [báo cáo nghiệm thu](reports/T02-STATUS-REPORT.md). T03 là task tiếp theo trong kế hoạch, chưa triển khai trong lượt nghiệm thu này.
+
+**Trạng thái T03 (16/11/2026): COMPLETED — PASS.** Offline gần nhất 47/47 PASS và typecheck PASS. Chủ dự án xác nhận passwordless denied và password login regression đều PASS sau khi tắt Enable magic links and email OTP: request OTP bị từ chối/không session; mật khẩu sai bị từ chối, đúng mật khẩu/getUser xác nhận OU đã xác minh, không yêu cầu OTP, logout thành công. Signup OU/OTP, SMTP, Gmail hook và cleanup có bằng chứng từ trước; snapshot cleanup read-only ngày 15/11/2026 không được coi là kiểm kê mới.
+
+**Giới hạn được chốt tại Final Acceptance:** signup + OTP verification **chưa được kiểm thử lại sau khi tắt passwordless**, chuyển thành regression tại T05 khi có tài khoản OU mới. Không ghi nhầm ca này đã PASS trên cấu hình hiện tại và không giữ làm blocker T03. Password login regression đã PASS; không suy ra toàn bộ Email Provider bị tắt chỉ từ email_provider_disabled.
+
+**Cập nhật manual runner:** đã sửa nhận diện đúng nhánh MagicLink disabled; log có email_provider_disabled/422, magicLinkDisabled=true, responseSession=false, getSession=null và PASS toàn mode. Xem mục 10 [báo cáo T03](reports/T03-STATUS-REPORT.md) cho quyết định nghiệm thu; các lần FAIL trước là lịch sử. Lượt chốt chỉ sửa hai tài liệu, không sửa Cloud/source/migration, không chạy lại tests hoặc triển khai T04/T05.
+
+Xem [báo cáo nghiệm thu T03](reports/T03-STATUS-REPORT.md); [T03-A Implementation](reports/T03-A-IMPLEMENTATION.md) là snapshot triển khai trước lượt nghiệm thu. Quên/đổi mật khẩu chưa thuộc T03; một OU account đủ cho riêng Auth, gate Prototype vẫn cần hai OU account ở mốc sau. Giữ chốt T02 Admin/Gmail khi hook bật; không dùng suite đó để chứng minh domain. T04-A có source/tests local, T04-B và T05 chưa triển khai.
 
 | ID | Công việc | Phụ thuộc | Tiêu chí xong |
 |---|---|---|---|
@@ -68,13 +78,13 @@
 
 ### Tiền điều kiện
 
-- Tài khoản A và B là **hai email OU khác nhau**, đã nhận OTP và xác thực thành công.
+- Tài khoản A và B là **hai email OU khác nhau**, đã đăng ký mật khẩu và xác minh email bằng OTP; đăng nhập bằng email + mật khẩu.
 - Một tài khoản Admin được cấp quyền từ DB, không tự gán quyền qua payload.
 - Database staging mới, seed hợp lệ, không dùng dữ liệu cá nhân thật ngoài test account được đồng ý.
 
 ### Checklist
 
-- [ ] 01. A đăng nhập OTP, vào `/`.
+- [ ] 01. A đăng nhập email + mật khẩu, không yêu cầu OTP, vào `/`.
 - [ ] 02. A đăng bài ẩn danh tag `CONFESSION` có 1 ảnh; publish thành công.
 - [ ] 03. B đăng nhập và thấy bài trong feed `Mới nhất`.
 - [ ] 04. B upvote một lần; count đúng; upvote lại không làm tăng trùng.
@@ -95,6 +105,7 @@
 - Xử lý cursor và thời gian 24h; lỗi OTP/Edge trả message an toàn.
 
 ### Integration
+- Auth: signup không session trước xác minh; đúng mật khẩu vẫn bị chặn khi chưa xác minh; OTP signup sai/đúng; login mật khẩu sai/đúng không gửi OTP; Gmail signUp bị hook từ chối; logout dọn session.
 - `createPost` + `publishPost` + upload 2 ảnh, tính trạng thái draft/published đúng.
 - Vote atomic với 2 request đồng thời; createPost/createComment retry bằng idempotency key.
 - `adminHideContent` chặn non-admin và ghi audit.
