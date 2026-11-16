@@ -25,6 +25,8 @@ interface Options {
   profileReply?: Reply
   insertReply?: Reply
   roleReply?: Reply
+  updateReply?: Reply
+  banAtUpdate?: boolean
   admin?: boolean
   concurrentProfile?: Profile
   invisibleAfterInsert?: boolean
@@ -65,6 +67,16 @@ function fixture(options: Options = {}) {
     const body: unknown = init?.body ? JSON.parse(String(init.body)) : null
     databaseCalls.push({ method, table, body })
     if (table === 'profiles') {
+      if (method === 'PATCH') {
+        assert.equal(url.searchParams.get('id'), `eq.${userId}`)
+        assert.equal(url.searchParams.get('status'), 'eq.ACTIVE')
+        assert.equal(url.searchParams.get('select'), 'nickname')
+        assert.deepEqual(Object.keys(body as object), ['nickname'])
+        if (options.updateReply) return reply(options.updateReply)
+        if (options.banAtUpdate || !profile) return reply({ status: 200, body: [] })
+        profile = { ...profile, nickname: (body as { nickname: string }).nickname }
+        return reply({ status: 200, body: [{ nickname: profile.nickname }] })
+      }
       if (method === 'GET') {
         assert.equal(url.searchParams.get('select'), 'nickname,status')
         assert.equal(url.searchParams.get('id'), `eq.${userId}`)
@@ -155,6 +167,51 @@ test('getMe: Auth xác minh OU confirmed + ACTIVE, allowlist DTO và masked emai
   assert.equal(f.authCalls, 1)
   assert.equal(f.adminClients, 1)
   assert.equal(f.insertCalls, 0)
+})
+
+test('updateNickname: trim Unicode, đúng chính chủ, không đổi status/role và DTO chỉ nickname', async () => {
+  const f = fixture()
+  const response = await f.handler(request({ action: 'updateNickname', payload: { nickname: '  OUer mới 👋  ' } }))
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.deepEqual(body.data, { nickname: 'OUer mới 👋' })
+  assert.equal(body.error, null)
+  assert.deepEqual(f.profile, { nickname: 'OUer mới 👋', status: 'ACTIVE' })
+  assert.equal(f.databaseCalls.filter(call => call.method === 'PATCH').length, 1)
+  assert.equal(JSON.stringify(body).includes(userId), false)
+  assert.equal(JSON.stringify(body).includes(email), false)
+})
+
+test('updateNickname: input sai/URL/control/giả userId hoặc quyền bị từ chối trước DB', async () => {
+  for (const payload of [
+    {}, { nickname: 5 }, { nickname: 'ab' }, { nickname: 'a'.repeat(31) },
+    { nickname: 'https://evil.invalid' }, { nickname: 'www.evil.invalid' }, { nickname: 'evil.com' },
+    { nickname: 'OU\nTest' }, { nickname: '\tOUer\t' }, { nickname: 'OU\u200bTest' },
+    { nickname: 'OUer', userId: otherId }, { nickname: 'OUer', status: 'ACTIVE' }, { nickname: 'OUer', role: 'ADMIN' },
+  ]) {
+    const f = fixture()
+    await expectFailure(await f.handler(request({ action: 'updateNickname', payload })), 400, 'VALIDATION_ERROR')
+    assert.equal(f.adminClients, 0)
+  }
+  const f = fixture()
+  assert.equal((await f.handler(request({ action: 'updateNickname', payload: { nickname: '👋'.repeat(30) } }))).status, 200)
+})
+
+test('updateNickname: guard JWT/OU/confirmed/BANNED và race ban, lỗi DB không rò dữ liệu', async () => {
+  for (const options of [
+    { profile: { nickname: 'OUer', status: 'BANNED' as const } },
+    { user: { email: 'offline@example.invalid' } }, { user: { email_confirmed_at: undefined } },
+    { banAtUpdate: true },
+  ]) {
+    const f = fixture(options)
+    await expectFailure(await f.handler(request({ action: 'updateNickname', payload: { nickname: 'Tên mới' } })), 403, 'FORBIDDEN')
+    assert.ok(f.databaseCalls.every(call => call.method !== 'PATCH') || options.banAtUpdate)
+  }
+  const missing = fixture()
+  await expectFailure(await missing.handler(request({ action: 'updateNickname', payload: { nickname: 'Tên mới' } }, { authorization: '' })), 401, 'UNAUTHENTICATED')
+  assert.equal(missing.adminClients, 0)
+  const error = fixture({ updateReply: { status: 500, body: { message: sensitive } } })
+  await expectFailure(await error.handler(request({ action: 'updateNickname', payload: { nickname: 'Tên mới' } })), 500, 'INTERNAL_ERROR')
 })
 
 test('JWT thiếu/sai cú pháp/key API không đi tới Auth hoặc DB', async () => {

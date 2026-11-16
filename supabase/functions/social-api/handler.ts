@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getMe, getOrCreateProfile } from './modules/profile/get-me.ts'
+import { updateNickname } from './modules/profile/update-nickname.ts'
 import { authenticate } from './shared/authentication.ts'
 import { authorizeAccount } from './shared/authorization.ts'
 import { ApiError, failure, success } from './shared/response.ts'
@@ -35,11 +36,14 @@ export function createSocialApiHandler(deps: Dependencies) {
         }
         return new Response(null, { status: 204, headers })
       }
-      await validateRequest(request)
+      const body = await validateRequest(request)
       const user = await authenticate(request, deps.createAuthClient)
       const admin = deps.createAdminClient()
       const profile = await getOrCreateProfile(admin, user.id)
       const isAdmin = await authorizeAccount(admin, user.id, profile)
+      if (body.action === 'updateNickname') {
+        return success(await updateNickname(admin, user.id, body.payload.nickname), requestId, headers)
+      }
       return success(getMe(user, profile, isAdmin), requestId, headers)
     } catch (error) {
       // Không log error/response thô: có thể chứa SQL, email hoặc bearer token.

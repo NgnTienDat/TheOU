@@ -2,6 +2,8 @@
 
 ## 1. Định hướng giao diện
 
+**UI baseline T05 đã duyệt:** [prototype và design conventions](fe-templates/README.md). React chuyển trực tiếp appearance/components của HTML; kiểm tra dark/light ở 360/390/768/1280px. Bỏ preview/mock/OTP mẫu. T05-A vào `/ca-nhan` sau xác thực/getMe, `/` tạm điều hướng về đó; feed là task sau.
+
 - **Ưu tiên tiếng Việt**, đơn giản, ngắn gọn, không dùng thuật ngữ kỹ thuật với sinh viên.
 - Mobile-first: một cột nội dung, tối đa rộng ~680 px cho feed trên desktop.
 - Phong cách trung tính, dễ đọc, tập trung vào văn bản; không sao chép giao diện thương hiệu của nền tảng khác.
@@ -55,7 +57,7 @@ flowchart TD
 
 **Lỗi tiếng Việt:** `Email hoặc mật khẩu không đúng`, `Email chưa được xác minh`, `Mã xác minh sai hoặc đã hết hạn`, `Bạn có thể yêu cầu mã mới sau ... giây`, `TheOU chỉ cho phép đăng ký bằng email @ou.edu.vn.`. Không tiết lộ tài khoản có tồn tại qua lỗi đăng nhập/đăng ký trùng. Xử lý mất mạng, rate limit, chưa nhận thư, user bị khóa; nút có loading và chống submit trùng.
 
-Đây là đặc tả T05 sẽ triển khai; T03 hiện chỉ có manual runner, chưa có UI.
+T05-A chuyển baseline thành React UI local; review và kiểm thử Cloud ở T05-B. T03/T04 đã nghiệm thu riêng.
 
 ## 4. Luồng 2 — Đọc bài và lọc
 
