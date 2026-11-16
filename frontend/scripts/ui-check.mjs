@@ -54,6 +54,7 @@ try {
         if (mode === 'update-error') { status = 500; body = {} }
         else { nickname = input.payload.nickname; body = envelope({ nickname }) }
       }
+      else if (input.action === 'listPosts') body = envelope({ items: [], nextCursor: null })
       else body = envelope({ nickname, emailMasked: '***@ou.edu.vn', isAdmin: false })
     } else throw new Error('Mock thiếu endpoint; không cho request đi ra mạng')
     await route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'x-supabase-api-version': '2024-01-01' }, body: JSON.stringify(body) })
@@ -86,7 +87,14 @@ try {
     await page.getByLabel('Mật khẩu', { exact: true }).fill(password)
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
   }
-  async function ready() { await page.waitForSelector('.profile-name') }
+  async function ready() {
+    if (new URL(page.url()).pathname !== '/ca-nhan') {
+      await page.getByRole('heading', { name: 'Bảng tin', exact: true }).waitFor()
+      assert.equal(new URL(page.url()).pathname, '/', 'login/OTP/retry chuyển về feed')
+      await page.getByRole('link', { name: 'Cá nhân', exact: true }).click()
+    }
+    await page.waitForSelector('.profile-name')
+  }
   async function logout() { await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForSelector('input[name=email]') }
   await page.goto('http://127.0.0.1:5188/ca-nhan')
   await page.waitForURL('**/dang-nhap'); await page.waitForSelector('input[name=email]')

@@ -14,6 +14,6 @@ export function SessionGate({ protectedRoute = false }: { protectedRoute?: boole
     <button className="logout" onClick={() => void task.run(controller.logout)} disabled={task.busy}>Đăng xuất</button>
   </div>
   if (protectedRoute && state.phase === 'guest') return <Navigate to="/dang-nhap" replace />
-  if (!protectedRoute && state.phase === 'ready') return <Navigate to="/ca-nhan" replace />
+  if (!protectedRoute && state.phase === 'ready') return <Navigate to="/" replace />
   return <Outlet />
 }

@@ -6,6 +6,9 @@ import { SessionGate } from '../features/auth/AuthRoutes.tsx'
 import { CredentialsPage } from '../features/auth/CredentialsPage.tsx'
 import { VerificationPage } from '../features/auth/VerificationPage.tsx'
 import { ProfilePage } from '../features/profile/ProfilePage.tsx'
+import { AppFrame } from '../shared/components/AppFrame.tsx'
+import { FeedPage } from '../features/feed/FeedPage.tsx'
+import { CreatePostPage } from '../features/posts/CreatePostPage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,8 +30,12 @@ export function App() {
                 <Route path="/xac-thuc" element={<VerificationPage />} />
               </Route>
               <Route element={<SessionGate protectedRoute />}><Route path="/ca-nhan" element={<ProfilePage />} /></Route>
-              <Route path="*" element={<Navigate to="/ca-nhan" replace />} />
             </Route>
+            <Route element={<AppFrame />}><Route element={<SessionGate protectedRoute />}>
+              <Route path="/" element={<FeedPage />} />
+              <Route path="/bai-viet/moi" element={<CreatePostPage />} />
+            </Route></Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

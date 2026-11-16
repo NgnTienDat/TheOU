@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "test": "node --test tests/*.test.ts",
     "test:ui": "node scripts/ui-check.mjs",
+    "test:ui:feed": "node scripts/feed-ui-check.mjs",
     "preview": "vite preview"
   },
   "engines": {

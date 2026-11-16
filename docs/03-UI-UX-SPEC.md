@@ -2,7 +2,7 @@
 
 ## 1. Định hướng giao diện
 
-**UI baseline T05 đã duyệt:** [prototype và design conventions](fe-templates/README.md). React chuyển trực tiếp appearance/components của HTML; kiểm tra dark/light ở 360/390/768/1280px. Bỏ preview/mock/OTP mẫu. T05-A vào `/ca-nhan` sau xác thực/getMe, `/` tạm điều hướng về đó; feed là task sau.
+**UI baseline T05 đã duyệt:** [prototype và design conventions](fe-templates/README.md). React giữ appearance/components của HTML; kiểm tra dark/light ở 360/390/768/1280px. Bỏ preview/mock/OTP mẫu. T07-A chuyển login/OTP thành công về Feed `/` sau xác thực/getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. Feed/Composer local đang chờ chủ dự án review UI và kiểm thử Cloud.
 
 - **Ưu tiên tiếng Việt**, đơn giản, ngắn gọn, không dùng thuật ngữ kỹ thuật với sinh viên.
 - Mobile-first: một cột nội dung, tối đa rộng ~680 px cho feed trên desktop.
@@ -66,9 +66,7 @@ flowchart TD
   A[Bảng tin] --> B[Chọn Mới nhất hoặc Nổi bật 24h]
   B --> C[Chọn Tất cả hoặc một tag]
   C --> D[Danh sách bài]
-  D --> E[Cuộn để tải thêm]
-  D --> F[Mở bài viết]
-  F --> G[Đọc bình luận / upvote]
+  D --> E[Bấm Tải thêm]
 ```
 
 ### Bố cục feed trên mobile
@@ -97,6 +95,8 @@ flowchart TD
 - Khi chuyển tab/tag, về đầu feed và reset cursor; giữ vị trí cuộn nếu mở bài rồi quay lại là cải tiến P1.
 - Bài viết `ANONYMOUS` ghi `OUer ẩn danh`; `NICKNAME` ghi nickname snapshot.
 
+**T07-A hiện tại:** chỉ render PostPublic, giữ xuống dòng; authorLabel lấy từ API, không ghép profile/email. Số vote/comment chỉ đọc, không có link tác giả, menu sửa/xóa, media hoặc route chi tiết chưa triển khai. Skeleton 3 bài, empty/error/retry, tải thêm có loading/error; cursor lỗi yêu cầu làm mới. Tag cuộn ngang; refresh và đổi sort/tag bắt đầu từ cursor null, không hiển thị dữ liệu filter cũ. HOT giữ thứ tự server; dedupe không bảo đảm không bỏ sót khi vote thay đổi. Mở bài/bình luận/upvote tương tác thuộc các task sau.
+
 ## 5. Luồng 3 — Viết bài
 
 ```mermaid
@@ -106,19 +106,20 @@ flowchart TD
   C --> D{Cần hiện biệt danh?}
   D -- Có --> E[Hiện nickname và contact URL nếu đủ điều kiện]
   D -- Không --> F[Ẩn contact URL]
-  E --> G[Thêm tối đa 2 ảnh]
-  F --> G
-  G --> H[Đăng bài]
-  H --> I{Tất cả bước hoàn tất?}
-  I -- Không --> J[Giữ bản nháp giao diện, báo lỗi]
-  I -- Có --> K[Đi tới chi tiết bài đã đăng]
+  E --> H[Đăng bài text]
+  F --> H
+  H --> I{createPost rồi publishPost hoàn tất?}
+  I -- Không --> J[Giữ snapshot trong bộ nhớ, báo lỗi và retry]
+  I -- Có --> K[Về Feed Mới nhất, tải lại từ đầu]
 ```
 
-**Trường hiển thị:** textarea giới hạn `1.000`, chọn 1 tag, công tắc `Đăng ẩn danh` **bật mặc định**, preview tác giả, tối đa 2 ảnh, nút `Đăng bài`.
+**Trường T07:** textarea đếm `body.trim()` theo Unicode code points, 1–1.000 ký tự; chọn 1 tag (Confession mặc định), chọn `Ẩn danh` **mặc định** hoặc `Biệt danh`, preview tác giả, nút `Đăng bài`. Từ chối NUL/lone surrogate. Ảnh thuộc T10, hiện không có input upload.
 
 **Lưu ý:** Liên kết liên hệ chỉ xuất hiện khi tag là `Tài liệu`/`Tìm trọ` và tắt ẩn danh. Khi chuyển sang ẩn danh, UI **xóa trường contact URL trong payload** để tránh lộ qua API. Backend vẫn validate độc lập.
 
-Đăng nhiều ảnh: hiển thị tiến độ chuẩn bị, upload, xác nhận; chỉ thông báo thành công sau khi bài được publish. Nếu lỗi, có thể thử lại và không tạo bài đăng trùng.
+Contact dùng HTTPS và exact hostname theo allowlist T06; không credentials/cổng khác mặc định/khoảng trắng/control. Đổi sang ẩn danh hoặc tag khác sẽ xóa giá trị contact và bỏ hẳn field khỏi payload.
+
+T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi tiết W2. UUID/payload canonical được khóa sau lần gửi đầu; retry create dùng cùng key/payload, đã ACK thì retry publish cùng postId. Fields bị khóa khi đang gửi hoặc chờ retry, text không mất khi lỗi mạng/server. Không lưu nội dung/key/postId vào storage. Rời qua link nội bộ có confirm; reload/đóng tab có cảnh báo native, Back/Forward SPA chưa chặn. Reload/rời trang hoặc Auth revalidation làm unmount có thể mất draft/trạng thái chưa rõ; không tự tạo bài mới để phục hồi. Quy trình có ảnh và khôi phục draft qua server thuộc các task sau.
 
 ## 6. Luồng 4 — Bình luận và upvote
 
