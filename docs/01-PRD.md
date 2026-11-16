@@ -1,9 +1,12 @@
 # 01 — Tài liệu yêu cầu sản phẩm (PRD)
 
 **Dự án:** TheOU  
-**Phiên bản:** 1.0  
-**Ngày:** 13/11/2026  
+**Phiên bản:** 1.1
+
+**Ngày:** 15/11/2026
 **Ưu tiên:** giao diện, tài liệu, vận hành bằng tiếng Việt.
+
+**Thay đổi yêu cầu T03:** đăng ký bằng email OU + mật khẩu, OTP 6 số chỉ để xác minh email đăng ký; đăng nhập bằng email + mật khẩu, không yêu cầu OTP. Luồng này thay thế đăng nhập không mật khẩu trước đây. Quên/đổi mật khẩu chưa triển khai trong T03.
 
 ## 1. Tóm tắt
 
@@ -44,7 +47,7 @@ Tất cả là **giả thuyết phải kiểm chứng**, không phải dữ li�
 
 | ID | Chức năng | Prototype (W1–W2) | MVP beta (W3–W4) |
 |---|---|---|---|
-| F01 | Đăng nhập OTP bằng email `@ou.edu.vn` | P0, bắt buộc | Tối ưu onboarding & rate limit gửi |
+| F01 | Đăng ký email `@ou.edu.vn` + mật khẩu, OTP xác minh; đăng nhập email + mật khẩu | P0, bắt buộc | Tối ưu onboarding & rate limit Auth |
 | F02 | Feed Mới nhất / Nổi bật 24h | P0 | Tối ưu tải và phân trang |
 | F03 | Bộ lọc 5 tag | P0 | Hoàn thiện trải nghiệm |
 | F04 | Tạo/xóa bài text, ẩn danh/biệt danh | P0 | Hạn chế spam, audit |
@@ -64,8 +67,12 @@ Tất cả là **giả thuyết phải kiểm chứng**, không phải dữ li�
 
 ## 6. Quy tắc nghiệp vụ chính
 
-- Chỉ người **đã xác thực OTP**, email domain hợp lệ và tài khoản `ACTIVE` được gọi social API.
-- Khi đăng ký, hệ thống kiểm tra domain phía server; không dựa vào kiểm tra ở form.
+- Chỉ người có phiên hợp lệ, **email đã được xác minh**, domain OU hợp lệ và tài khoản `ACTIVE` được gọi social API.
+- Đăng ký: email OU + mật khẩu → OTP 6 số xác minh email → tài khoản được xác minh. Bật Confirm email; trước OTP không cấp session và không cho đăng nhập bằng mật khẩu.
+- Đăng nhập: email + mật khẩu, không gửi hoặc yêu cầu OTP. Mật khẩu sai không tạo session; không phân biệt công khai tài khoản không tồn tại với sai mật khẩu.
+- Khi đăng ký, Before User Created Hook kiểm tra chính xác domain `ou.edu.vn` phía server; không dựa vào kiểm tra ở form. Hook không thay thế kiểm tra email đã xác minh/domain/ACTIVE trên mỗi social API request.
+- Mật khẩu đăng ký tối thiểu 8 ký tự, tối đa 72 byte UTF-8; không trim/chuẩn hóa. Auth chịu trách nhiệm lưu hash; không lưu mật khẩu trong DB nghiệp vụ, file, analytics hoặc log. Cấu hình server phải thực thi cùng chính sách.
+- OTP đăng ký có hạn 10 phút, gửi lại theo cooldown tối thiểu 60 giây; OTP sai/hết hạn không xác minh email. Quên/đổi mật khẩu và chuyển đổi tài khoản OTP cũ chưa nằm trong T03.
 - Bài `PUBLISHED` hiển thị trên feed; `DRAFT`, `HIDDEN`, `DELETED` không hiện với người đọc thường.
 - Người đăng được xóa mềm bài của mình; người bình luận được xóa mềm bình luận của mình; admin có thể ẩn/gỡ.
 - Một người chỉ có **một upvote cho một bài**; bấm lại để bỏ upvote. Không có downvote trong 4 tuần.
@@ -82,7 +89,7 @@ Không: kết bạn/follow, chat, thông báo realtime, gửi email sự kiện,
 ### Prototype sau 2 tuần — Tiêu chí nghiệm thu
 
 1. Triển khai online **khu vực thử nghiệm khép kín** với ít nhất hai tài khoản OU riêng biệt và một admin.
-2. A nhập email OU → OTP → đăng nhập → tạo bài ẩn danh với một tag.
+2. A đăng ký email OU + mật khẩu → xác minh OTP; các lần đăng nhập dùng email + mật khẩu → tạo bài ẩn danh với một tag.
 3. B đăng nhập → đọc bài A → upvote → bình luận.
 4. A trở lại → trả lời bình luận; B chỉ nhìn thấy `Chủ bài`, không thể suy ra email/MSSV/user UUID qua response API.
 5. Bài mới xuất hiện ở `Mới nhất`, bài trong 24h xuất hiện ở `Nổi bật` theo quy tắc.

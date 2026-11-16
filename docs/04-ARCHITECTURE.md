@@ -12,7 +12,7 @@
 | UI | Tailwind CSS | Design system tối giản |
 | Routing | React Router | Auth guard, trang social/admin |
 | Server state | TanStack Query | Cache, phân trang, mutation và retry có kiểm soát |
-| Auth | Supabase Auth | Email OTP, session JWT |
+| Auth | Supabase Auth | Email/mật khẩu, OTP xác minh đăng ký, session JWT |
 | Business API | Supabase Edge Functions (TypeScript/Deno) | Xác thực, kiểm tra quyền, nghiệp vụ, dữ liệu an toàn |
 | Database | Supabase PostgreSQL | Nội dung, upvote, moderation, audit |
 | Media | Supabase Storage **private** | Ảnh bài viết, signed URL ngắn hạn |
@@ -26,7 +26,7 @@
 ```mermaid
 flowchart TD
   U[Sinh viên OU] --> WEB[React SPA / Vite]
-  WEB --> AUTH[Supabase Auth / OTP]
+  WEB --> AUTH[Supabase Auth / email và mật khẩu]
   WEB --> API[Edge Function: social-api]
   API --> PG[(PostgreSQL: public tables)]
   API --> ST[Storage: private post-media]
@@ -50,7 +50,7 @@ flowchart TD
 
 Đây là một **backend nhẹ**, không phải lựa chọn “không backend”. Sau này NestJS sẽ thay chính lớp này.
 
-## 4. Tổ chức mã nguồn T01–T02
+## 4. Tổ chức mã nguồn T01–T04-A
 
 ```text
 TheOU/
@@ -84,7 +84,7 @@ TheOU/
 │
 ├── supabase/
 │   ├── migrations/              # T02: schema, constraints, RLS/grants, triggers
-│   ├── functions/               # Giữ chỗ; social-api bắt đầu T04
+│   ├── functions/social-api/    # T04-A: index.ts, handler.ts, shared/, modules/profile/
 │   ├── tests/                   # PostgreSQL offline và integration Cloud tách biệt
 │   ├── package.json             # Tooling test Node, không phải REST backend
 │   ├── package-lock.json
@@ -101,7 +101,11 @@ TheOU/
 └── README.md
 ```
 
-Các thư mục feature, components/constants và `supabase/functions/` chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB đặt trong `supabase/tests/`. Từ T04, `supabase/functions/social-api/` gồm `index.ts`, `modules/` theo nghiệp vụ và `shared/` cho auth/errors/validation/client; không dồn toàn bộ logic vào entrypoint.
+Các thư mục feature, components/constants chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04-A có `social-api/index.ts` khởi động Deno, `handler.ts` dispatch, `modules/profile/` cho getMe và `shared/` cho guard/errors/validation/client. Chưa có action nghiệp vụ khác hoặc deployment Cloud.
+
+**Quyết định T04-A:** gateway giữ `verify_jwt = true`; handler gọi `auth.getUser(token)` bằng publishable client để xác minh với Auth server. Chỉ sau khi email chính xác domain OU và đã xác minh mới khởi tạo client đặc quyền, đọc profile bằng ID từ Auth, chặn BANNED rồi đọc ADMIN từ `user_roles`. Các lượt đọc profile/role này là một phần authorization bắt buộc vì T02 khóa raw tables đối với user client. Client đặc quyền không nhận session/Authorization từ request.
+
+Profile thiếu được insert bằng `upsert(..., { onConflict: 'id', ignoreDuplicates: true })` rồi SELECT lại; không merge/update nickname/status và không cấp role. Khóa chính T02 bảo vệ concurrent initialization; chưa cần migration mới. Nickname mặc định ngẫu nhiên `OUer-1234`, không suy ra từ email/UUID và không yêu cầu duy nhất. Chi tiết kiểm thử, giới hạn và hướng dẫn T04-B ở [báo cáo T04-A](reports/T04-A-IMPLEMENTATION.md).
 
 T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanStack Query provider với retry mặc định tắt. `shared/lib/supabase.ts` cung cấp `getSupabaseClient()` khởi tạo khi cần từ env; dev/build kiểm tra URL và publishable key trước khi đóng gói. Không dùng JWT anon legacy hoặc key đặc quyền trong frontend. `.env.local` được Vite đọc tự động và không commit. Unit test dùng Node.js test runner tích hợp để tránh thêm dependency chỉ phục vụ nền tảng.
 
@@ -115,14 +119,18 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 
 ## 6. Luồng xác thực
 
-1. Người dùng nhập email; UI kiểm tra nhanh domain `@ou.edu.vn`.
-2. Supabase Auth `signInWithOtp` gửi mã, template email có `{{ .Token }}` để hiện **OTP 6 số**.
-3. **Before User Created Hook** chặn tạo tài khoản email ngoài domain, không dựa vào frontend; lưu cấu hình hook và kiểm thử.
-4. Người dùng nhập OTP → `verifyOtp({ email, token, type: 'email' })`; Auth trả về session.
-5. Mỗi Edge Function user-facing kiểm tra JWT còn hiệu lực, email OU, account ACTIVE và role khi cần; việc đăng ký trước đây không thay thế kiểm tra phiên hiện tại.
-6. Không cấp bất kỳ response nội dung riêng tư nào khi chưa qua kiểm tra.
+**Thay đổi được chủ dự án chốt 15/11/2026:** OTP chỉ xác minh đăng ký; các lần đăng nhập dùng mật khẩu.
+
+1. Đăng ký: module Auth gọi `signUp({ email, password })` với email thuộc chính xác `@ou.edu.vn`; mật khẩu không trim, tối thiểu 8 ký tự và tối đa 72 byte UTF-8. Supabase Auth lưu hash, không đưa mật khẩu qua social-api hoặc app DB.
+2. **Before User Created Hook** giữ nguyên, chặn tạo tài khoản email ngoài domain phía server. Confirm email phải bật: signup trả session null.
+3. Template **Confirm signup** dùng `{{ .Token }}` để gửi OTP 6 số; `verifyOtp({ email, token, type: 'email' })` xác minh đăng ký và trả session. Gửi lại dùng `resend({ type: 'signup', email })` theo cooldown, chưa triển khai UI T05.
+4. Đăng nhập: `signInWithPassword({ email, password })`, không gọi `signInWithOtp`, không yêu cầu OTP. Email chưa xác minh hoặc mật khẩu sai không có session.
+5. Mỗi Edge Function user-facing kiểm tra JWT còn hiệu lực, email OU **đã xác minh**, account ACTIVE và role khi cần; việc đăng ký trước đây không thay thế kiểm tra phiên hiện tại.
+6. Đăng xuất dọn session; không lưu mật khẩu/OTP/JWT trong log. Chưa triển khai quên/đổi mật khẩu hoặc tự chuyển đổi tài khoản OTP cũ trong T03.
 
 **Cấu hình bắt buộc:** custom SMTP trước khi thử nghiệm nhiều tài khoản; máy chủ email mặc định của Supabase chỉ phục vụ thử nghiệm hạn chế. Các rate limit/auth options có thể thay đổi theo nhà cung cấp và cấu hình dự án.
+
+**T03 COMPLETED (16/11/2026):** hook domain đã triển khai, passwordless bị tắt phía server; password login regression PASS theo chủ dự án. Signup/OTP đã PASS trước thay đổi settings; regression sau thay đổi chuyển T05 khi có OU account mới. Hook không kiểm soát Admin API hoặc đăng nhập account đã tồn tại, nên guard T04 vẫn kiểm tra email/confirmed/status từng request. Xem [nghiệm thu T03](reports/T03-STATUS-REPORT.md).
 
 ## 7. Luồng đăng bài có ảnh
 
@@ -164,7 +172,7 @@ Post text không ảnh cũng qua `DRAFT → PUBLISHED`. Retry `createPost` phả
 - **Môi trường:** frontend chạy tại máy, Development DB dùng Supabase Cloud **TheOU-dev**. Không dùng Docker/Supabase Local Stack. Staging/beta phải có phạm vi tài khoản và phê duyệt riêng. T02 dùng PGlite trong bộ nhớ để kiểm tra migration SQL offline; đây không phải Supabase server và không thay thế test Cloud. Mọi push migration và test ghi Cloud phải được chủ dự án phê duyệt trước.
 - **CI tối thiểu:** typecheck, lint, unit test, build, migrations smoke test, Edge tests và e2e chính.
 - **Secrets:** frontend chỉ có Supabase URL và publishable key; SMTP, storage admin và database secret chỉ lưu trên Supabase/Vercel server env nếu cần; không commit `.env`.
-- **Logging:** log request ID, action, status, thời lượng, error code; **không** log OTP, JWT, email nguyên dạng, nội dung bài nhạy cảm, IP nếu không cần.
+- **Logging:** log request ID, action, status, thời lượng, error code; **không** log mật khẩu, OTP, JWT, email nguyên dạng, nội dung bài nhạy cảm, IP nếu không cần.
 - **Giám sát:** lỗi OTP/upload/Edge Function, số request thất bại; kiểm tra ngân sách Storage/email và chi phí egress.
 - **Thời gian:** DB UTC, UI theo giờ địa phương VN.
 

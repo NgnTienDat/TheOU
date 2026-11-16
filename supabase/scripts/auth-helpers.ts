@@ -43,7 +43,7 @@ export function createRejectionEmail(value: string, runId: string): string {
 
 export function readManualAuthConfig(env: NodeJS.ProcessEnv, linkedRef: string) {
   if (env.THEOU_ALLOW_AUTH_TESTS !== 'theou-dev') {
-    throw new ManualAuthError('Chưa xác nhận test gửi email: đặt THEOU_ALLOW_AUTH_TESTS=theou-dev sau khi được phê duyệt.')
+    throw new ManualAuthError('Chưa xác nhận manual test Cloud: đặt THEOU_ALLOW_AUTH_TESTS=theou-dev sau khi được phê duyệt.')
   }
   const ref = 'puhkisyehspcmgzerutm'
   const url = env.THEOU_AUTH_SUPABASE_URL?.trim()

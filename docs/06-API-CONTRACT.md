@@ -4,9 +4,9 @@
 
 ## 1. Quy ước chung
 
-- Dữ liệu Auth (`signInWithOtp`, `verifyOtp`, `signOut`) do `supabase.auth` đảm nhiệm trực tiếp.
+- Dữ liệu Auth (`signUp`, `verifyOtp`, `signInWithPassword`, `signOut`) do module Auth gọi `supabase.auth` trực tiếp; UI component không gọi SDK. OTP chỉ xác minh đăng ký, không dùng đăng nhập không mật khẩu.
 - Nghiệp vụ sử dụng `supabase.functions.invoke('social-api', { body: { action, payload } })` với JWT người dùng; **mọi action đều POST JSON**.
-- `social-api` yêu cầu user JWT; sau khi xác thực, kiểm tra email OU, profile `ACTIVE`, role nếu cần. Không có truy cập nội dung social cho khách.
+- `social-api` yêu cầu user JWT; sau khi xác thực, kiểm tra email OU **đã xác minh**, profile `ACTIVE`, role nếu cần. Không có truy cập nội dung social cho khách.
 - Response dạng `{ "data": ... , "error": null, "meta": { "requestId": "..." } }` hoặc `{ "data": null, "error": { "code": "...", "message": "...", "details": null }, "meta": {...} }`.
 - Date string ISO 8601 UTC, UUID string; API `camelCase`, DB `snake_case`; không trả raw DB row.
 - Validate cả frontend và server; server là nguồn xác thực cuối cùng.
@@ -25,6 +25,26 @@
 | `INTERNAL_ERROR` | Lỗi hệ thống | Thông báo chung và request ID |
 
 Status HTTP tương ứng nếu có: 401/403/400/404/409/429/500. Không đưa SQL, JWT hoặc email của người khác vào `details`.
+
+### Hợp đồng Auth — yêu cầu T03 cập nhật 15/11/2026
+
+Các thao tác sau là Supabase Auth API, không phải `social-api` action và không dùng envelope nghiệp vụ ở trên:
+
+| Thao tác | SDK/input | Thành công mong đợi | Lỗi quan trọng |
+|---|---|---|---|
+| Đăng ký | `signUp({ email, password })` | Confirm email bật: `data.session === null`; email chờ OTP xác minh | Hook từ chối domain ngoài OU; weak password; rate limit |
+| Xác minh đăng ký | `verifyOtp({ email, token, type: 'email' })` | Session hợp lệ và user có `email_confirmed_at` | `otp_expired` cho mã sai/hết hạn; không session |
+| Gửi lại xác minh (T05) | `resend({ type: 'signup', email })` | Yêu cầu được tiếp nhận, không tự tạo session | Cooldown/rate limit; chưa có manual mode gửi lại |
+| Đăng nhập | `signInWithPassword({ email, password })` | Session và user OU đã xác minh; không yêu cầu/gửi OTP | `invalid_credentials`, `email_not_confirmed`, rate limit |
+| Đăng xuất | `signOut({ scope: 'local' })` | `getSession()` của app/script trả null | Mất mạng hoặc lỗi logout cần báo chưa xác minh |
+
+Email trim/lowercase, đúng cú pháp và chính xác domain `ou.edu.vn`. Mật khẩu đăng ký ít nhất 8 ký tự, tối đa 72 byte UTF-8, không trim/chuẩn hóa; mật khẩu đăng nhập giữ nguyên giá trị đã có. Chính sách mật khẩu phải thực thi ở Auth server. OTP gồm đúng 6 số ASCII, hạn 600 giây; gửi lại theo cooldown tối thiểu 60 giây.
+
+Không lưu mật khẩu/OTP vào file, URL, log/analytics hoặc bảng nghiệp vụ. Chỉ Auth lưu hash mật khẩu; password đi thẳng tới Auth qua HTTPS. Trước khi coi xác thực thành công, kiểm tra lỗi, session và `getUser()` xác nhận email OU đã xác minh. Không tin payload hoặc user_metadata tự khai báo trạng thái xác minh.
+
+Không dùng phản hồi `signUp` thành công làm bằng chứng user mới đã tạo: Auth có thể che việc email đã tồn tại. Không công khai sự tồn tại tài khoản; `invalid_credentials` hiển thị `Email hoặc mật khẩu không đúng`. Tài khoản chưa xác minh được hướng dẫn xác minh đăng ký, không chuyển sang đăng nhập OTP. Logout không bảo đảm JWT access token đã cấp hết hiệu lực ngay.
+
+Quên/đổi mật khẩu, nâng cấp tài khoản OTP cũ và UI T05 chưa triển khai trong T03. Không gọi `signUp` lại để thay mật khẩu tài khoản đã tồn tại.
 
 ## 2. DTO công khai
 
@@ -99,6 +119,14 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 
 Với `listPosts`, tag `null` = tất cả; `HOT` chỉ lấy bài `publishedAt >= now() - 24h`. `getPost` chỉ trả bài `PUBLISHED` đối với người thường. Admin access nội dung ẩn đi qua action riêng, không biến `getPost` thành endpoint tiết lộ thông tin nhạy cảm.
 
+### Phạm vi triển khai T04-A — chỉ `getMe`
+
+POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field thừa ở envelope/payload, body tối đa 4 KiB. Action khác hoặc request/method/content-type sai trả VALIDATION_ERROR/400. Guard từ chối JWT thiếu/sai/hết hạn bằng UNAUTHENTICATED/401; email ngoài OU/chưa xác minh hoặc BANNED bằng FORBIDDEN/403. Lỗi Auth/DB hệ thống trả INTERNAL_ERROR/500 với thông báo chung; không đưa response gốc vào details/log.
+
+Data đúng ba trường `{ "nickname": "OUer-1234", "emailMasked": "***@ou.edu.vn", "isAdmin": false }`, không trả UUID/email đầy đủ/metadata. EmailMasked chỉ thuộc chính chủ; che toàn bộ local part để không lộ MSSV. Profile thiếu được insert an toàn, giữ hàng thắng khi concurrent/retry; profile đã tồn tại không bị thay đổi. Role ADMIN chỉ đọc từ DB.
+
+OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend cần xử lý lỗi gateway riêng. Các action còn lại trong bảng mục 3 là thiết kế, chưa triển khai.
+
 ## 4. Các thao tác cần atomic và idempotent
 
 - `createPost`: client tạo `idempotencyKey` UUID khi bắt đầu submit; request cùng `(author_id,key)` trả về **cùng một draft**, không tạo thêm.
@@ -171,14 +199,14 @@ Các phương thức còn lại tuân theo cùng mẫu. `SupabaseSocialApiClient
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
-T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. Chưa có action chạy thực tế. Khi triển khai T04/T06/T08/T11 phải thêm test với phiên A/B thật: A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
+T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04-A có getMe/guard và tests HTTP offline, chưa deploy Edge Cloud. Khi triển khai T04-B/T06/T08/T11 phải thêm test với phiên thật theo phạm vi: getMe chính chủ; A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
 
 Pseudocode chung:
 
 ```text
 1. Verify JWT từ Authorization header.
 2. Lấy userId/email từ nguồn xác thực đáng tin, không đọc từ payload.
-3. Kiểm tra domain OU và profile.status == ACTIVE.
+3. Kiểm tra email đã xác minh, domain OU và profile.status == ACTIVE.
 4. Kiểm tra role ADMIN nếu là admin action.
 5. Validate input bằng schema runtime, kiểm tra quyền sở hữu/thao tác.
 6. Thực hiện query/transaction atomically.

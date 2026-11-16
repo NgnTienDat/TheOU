@@ -13,5 +13,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "scripts/**/*.ts"]
+  "include": ["tests/**/*.ts", "scripts/**/*.ts", "functions/social-api/**/*.ts"],
+  "exclude": ["functions/social-api/index.ts"]
 }

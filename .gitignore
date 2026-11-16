@@ -13,3 +13,5 @@ coverage/
 signing_keys.json
 supabase/.temp/
 supabase/.branches/
+diary/
+docs/reports/

@@ -1,4 +1,4 @@
-name: Database offline checks
+name: Supabase offline checks
 
 on: [push, pull_request]
 
@@ -19,5 +19,11 @@ jobs:
           cache: npm
           cache-dependency-path: supabase/package-lock.json
       - run: npm ci
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
       - run: npm run typecheck
+      - run: npm run typecheck:edge
+      - run: npm run lint:edge
+      - run: deno fmt --check --config functions/social-api/deno.json functions/social-api
       - run: npm test

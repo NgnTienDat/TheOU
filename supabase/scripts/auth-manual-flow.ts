@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createRejectionEmail, domainRejectionMessage, ManualAuthError, normalizeOuEmail, parseOtp, parsePassword } from './auth-helpers.ts'
+import type { SocialApiIdentity } from './social-api-manual.ts'
 
 type AuthError = { code?: string; status?: number; message?: string } | null
 type User = { id: string; email?: string; email_confirmed_at?: string }
@@ -17,7 +18,7 @@ export interface ManualAuthClient {
   signOut(input: { scope: 'local' }): Promise<{ error: AuthError }>
 }
 
-export const manualAuthModes = ['signup', 'verify-signup', 'login', 'reject', 'passwordless-denied'] as const
+export const manualAuthModes = ['signup', 'verify-signup', 'login', 'reject', 'passwordless-denied', 'get-me'] as const
 export type ManualAuthMode = typeof manualAuthModes[number]
 
 function requireSuccess(error: AuthError, message: string): void {
@@ -40,7 +41,7 @@ async function requireNoSession(auth: ManualAuthClient): Promise<void> {
   requireCondition(!current.data.session, 'FAIL: thao tác bị từ chối hoặc đăng ký chưa xác minh vẫn có session.')
 }
 
-async function requireVerifiedSession(auth: ManualAuthClient, response: SessionResponse, email: string): Promise<void> {
+async function requireVerifiedSession(auth: ManualAuthClient, response: SessionResponse, email: string): Promise<Session> {
   requireSuccess(response.error, 'Xác thực thất bại. Kiểm tra cấu hình Auth; không in response thô.')
   requireCondition(response.data.session?.access_token, 'FAIL: Auth không trả session hợp lệ.')
   const current = await auth.getUser()
@@ -51,6 +52,8 @@ async function requireVerifiedSession(auth: ManualAuthClient, response: SessionR
   const stored = await auth.getSession()
   requireSuccess(stored.error, 'Không đọc được session trong bộ nhớ.')
   requireCondition(stored.data.session?.user.id === current.data.user.id, 'FAIL: không tìm thấy session sau xác thực.')
+  requireCondition(stored.data.session?.access_token === response.data.session.access_token, 'FAIL: session trong bộ nhớ không khớp phiên vừa xác thực.')
+  return stored.data.session
 }
 
 export async function runManualAuth(
@@ -58,11 +61,13 @@ export async function runManualAuth(
   mode: ManualAuthMode,
   askHidden: (prompt: string) => Promise<string>,
   report: (message: string) => void,
+  checkGetMe?: (identity: SocialApiIdentity) => Promise<void>,
 ): Promise<void> {
   let failure: unknown
   let password = ''
   let token = ''
   try {
+    requireCondition(mode !== 'get-me' || checkGetMe, 'FAIL: chưa kết nối bộ kiểm tra getMe; chưa gọi API.')
     if (mode === 'passwordless-denied') {
       const email = normalizeOuEmail(await askHidden('Email OU đã tồn tại (ẩn): '))
       await requireNoSession(auth)
@@ -107,17 +112,23 @@ export async function runManualAuth(
         await requireNoSession(auth)
         report('PASS: đăng ký chưa tạo session; đăng nhập bằng đúng mật khẩu bị email_not_confirmed trước OTP. Kiểm tra Inbox/Spam.')
       }
-      if (mode === 'login') {
+      if (mode === 'login' || mode === 'get-me') {
         password = parsePassword(await askHidden('Mật khẩu tài khoản OU đã xác minh (ẩn): '), 'login')
-        // Sai ngay byte đầu để không trùng mật khẩu thật, kể cả với giới hạn bcrypt.
-        const wrongPassword = `${password[0] === 'a' ? 'b' : 'a'}${password.slice(1)}`
-        const wrong = await auth.signInWithPassword({ email, password: wrongPassword })
-        requireCondition(wrong.error?.code === 'invalid_credentials' && !wrong.data.session,
-          'FAIL: mật khẩu sai chưa bị từ chối đúng kiểu; không coi lỗi mạng/rate limit là test đạt.')
-        await requireNoSession(auth)
-        report('PASS: mật khẩu sai bị từ chối, không có session. Tiếp tục kiểm tra mật khẩu đúng.')
-        await requireVerifiedSession(auth, await auth.signInWithPassword({ email, password }), email)
+        if (mode === 'login') {
+          // Sai ngay byte đầu để không trùng mật khẩu thật, kể cả với giới hạn bcrypt.
+          const wrongPassword = `${password[0] === 'a' ? 'b' : 'a'}${password.slice(1)}`
+          const wrong = await auth.signInWithPassword({ email, password: wrongPassword })
+          requireCondition(wrong.error?.code === 'invalid_credentials' && !wrong.data.session,
+            'FAIL: mật khẩu sai chưa bị từ chối đúng kiểu; không coi lỗi mạng/rate limit là test đạt.')
+          await requireNoSession(auth)
+          report('PASS: mật khẩu sai bị từ chối, không có session. Tiếp tục kiểm tra mật khẩu đúng.')
+        }
+        const session = await requireVerifiedSession(auth, await auth.signInWithPassword({ email, password }), email)
+        password = ''
         report('PASS: đăng nhập bằng email/mật khẩu, getUser xác nhận OU đã xác minh; không yêu cầu OTP hoặc gửi email.')
+        if (mode === 'get-me' && checkGetMe) {
+          await checkGetMe({ userId: session.user.id, email, accessToken: session.access_token })
+        }
       } else {
         token = parseOtp(await askHidden('OTP 6 số xác minh đăng ký đã nhận (ẩn): '))
         const wrongToken = `${(Number(token[0]) + 1) % 10}${token.slice(1)}`

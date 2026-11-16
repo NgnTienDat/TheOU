@@ -13,7 +13,8 @@
 | Đường dẫn | Tên hiển thị | Ai vào được | Mốc |
 |---|---|---|---|
 | `/dang-nhap` | Đăng nhập | Khách | W1 |
-| `/xac-thuc` | Nhập mã OTP | Khách đã yêu cầu OTP | W1 |
+| `/dang-ky` | Đăng ký | Khách | W1 |
+| `/xac-thuc` | Xác minh email đăng ký | Khách có đăng ký đang chờ xác minh | W1 |
 | `/` | Bảng tin | Thành viên OU | W1 |
 | `/bai-viet/moi` | Viết bài | Thành viên OU | W1 |
 | `/bai-viet/:id` | Chi tiết bài & bình luận | Thành viên OU | W2 |
@@ -31,21 +32,30 @@ Không làm chat, tìm kiếm, thông báo, trang người dùng công khai, pro
 flowchart TD
   A[Mở TheOU] --> B{Đã có phiên hợp lệ?}
   B -- Có --> C[Bảng tin]
-  B -- Không --> D[Nhập email OU]
-  D --> E{Email hợp lệ?}
-  E -- Không --> F[Hiện thông báo]
-  F --> D
-  E -- Có --> G[Gửi OTP]
-  G --> H[Nhập 6 số]
-  H --> I{OTP đúng và còn hạn?}
-  I -- Không --> J[Thông báo lỗi / thử lại]
-  J --> H
-  I -- Có --> C
+  B -- Không --> D{Đã có tài khoản?}
+  D -- Chưa --> E[Nhập email OU, mật khẩu và nhập lại mật khẩu]
+  E --> F[Đăng ký và gửi OTP xác minh email]
+  F --> G[Nhập OTP 6 số]
+  G --> H{OTP đúng và còn hạn?}
+  H -- Không --> I[Báo lỗi, gửi lại theo cooldown]
+  I --> G
+  H -- Có --> C
+  D -- Có --> J[Nhập email và mật khẩu]
+  J --> K{Đúng mật khẩu và email đã xác minh?}
+  K -- Có --> C
+  K -- Không --> L[Báo lỗi hoặc hướng dẫn xác minh email]
+  L --> J
 ```
 
-**Văn bản UI đề xuất:** `Dùng email OU để tham gia cộng đồng`, `Gửi mã xác thực`, `Nhập mã gồm 6 chữ số`, `Bạn có thể yêu cầu mã mới sau ... giây`, `Email này không thuộc domain được hỗ trợ`.
+**Đăng ký:** email OU (`autocomplete="email"`), mật khẩu/nhập lại (`type="password"`, `autocomplete="new-password"`), nút `Đăng ký`. Không trim mật khẩu; tối thiểu 8 ký tự, tối đa 72 byte UTF-8. Sau đăng ký chưa có session; chuyển tới xác minh email, không vào feed.
 
-Trường hợp lỗi: mất mạng, OTP sai/hết hạn, gửi quá thường xuyên, email đúng domain nhưng chưa nhận được mail, user bị khóa. Không hiển thị email đầy đủ sau khi nhập; che bớt ở màn hình OTP.
+**Xác minh đăng ký:** input 6 số (`inputmode="numeric"`, `autocomplete="one-time-code"`), nút `Xác minh email`, `Gửi lại mã` theo cooldown. Chỉ gửi lại mã xác minh signup, không gọi đăng nhập OTP. Không lưu mật khẩu vào URL, route state hoặc localStorage; xóa khỏi form khi rời bước đăng ký. Email được che bớt trên màn hình OTP.
+
+**Đăng nhập:** email + mật khẩu (`type="password"`, `autocomplete="current-password"`), nút `Đăng nhập` và đường dẫn `Chưa có tài khoản? Đăng ký`. Không có bước gửi/nhập OTP khi đăng nhập. Chưa có nút/luồng quên hoặc đổi mật khẩu trong T03.
+
+**Lỗi tiếng Việt:** `Email hoặc mật khẩu không đúng`, `Email chưa được xác minh`, `Mã xác minh sai hoặc đã hết hạn`, `Bạn có thể yêu cầu mã mới sau ... giây`, `TheOU chỉ cho phép đăng ký bằng email @ou.edu.vn.`. Không tiết lộ tài khoản có tồn tại qua lỗi đăng nhập/đăng ký trùng. Xử lý mất mạng, rate limit, chưa nhận thư, user bị khóa; nút có loading và chống submit trùng.
+
+Đây là đặc tả T05 sẽ triển khai; T03 hiện chỉ có manual runner, chưa có UI.
 
 ## 4. Luồng 2 — Đọc bài và lọc
 
@@ -130,6 +140,7 @@ flowchart TD
 | Feed | Skeleton 3 bài | `Chưa có bài viết nào. Hãy mở đầu câu chuyện!` | `Không tải được bảng tin` + Thử lại |
 | Bình luận | Skeleton ngắn | `Chưa có bình luận nào` | `Không tải được bình luận` |
 | OTP | Disable gửi trong lúc xử lý | — | Lỗi rõ nguyên nhân ở mức an toàn |
+| Đăng ký/đăng nhập | Disable submit trong lúc xử lý | — | Lỗi trường nhập hoặc thông báo Auth an toàn |
 | Viết bài | Loading trên nút Đăng | — | Giữ nội dung đang soạn |
 | Ảnh | Placeholder | Không ảnh | Ảnh lỗi + tùy chọn thử lại |
 | Admin | Skeleton danh sách | Chưa có báo cáo | Không thể tải thông tin |
