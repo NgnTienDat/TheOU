@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Link, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { AuthProvider } from '../features/auth/AuthProvider.tsx'
+import { AuthLayout } from '../features/auth/AuthLayout.tsx'
+import { SessionGate } from '../features/auth/AuthRoutes.tsx'
+import { CredentialsPage } from '../features/auth/CredentialsPage.tsx'
+import { VerificationPage } from '../features/auth/VerificationPage.tsx'
+import { ProfilePage } from '../features/profile/ProfilePage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,16 +18,19 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <main className="mx-auto flex min-h-svh max-w-2xl flex-col justify-center gap-4 px-6 py-12">
-          <h1 className="text-4xl font-bold text-emerald-800">TheOU</h1>
+        <AuthProvider>
           <Routes>
-            <Route path="/" element={<p>Không gian dành cho cộng đồng OU đang được chuẩn bị.</p>} />
-            <Route path="*" element={<p>Không tìm thấy trang. <Link className="underline" to="/">Về trang chủ</Link></p>} />
+            <Route element={<AuthLayout />}>
+              <Route element={<SessionGate />}>
+                <Route path="/dang-nhap" element={<CredentialsPage key="login" />} />
+                <Route path="/dang-ky" element={<CredentialsPage key="signup" signup />} />
+                <Route path="/xac-thuc" element={<VerificationPage />} />
+              </Route>
+              <Route element={<SessionGate protectedRoute />}><Route path="/ca-nhan" element={<ProfilePage />} /></Route>
+              <Route path="*" element={<Navigate to="/ca-nhan" replace />} />
+            </Route>
           </Routes>
-          <p className="text-sm text-slate-600">
-            TheOU là dự án độc lập do sinh viên phát triển, không phải kênh chính thức của Trường Đại học Mở TP.HCM.
-          </p>
-        </main>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   )

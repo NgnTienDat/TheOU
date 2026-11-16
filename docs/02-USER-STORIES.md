@@ -19,6 +19,7 @@
 - **AC08:** Logout dọn session phía app; route và social API vẫn yêu cầu phiên hợp lệ. Không tuyên bố access token cũ mất hiệu lực ngay lập tức.
 - **AC09:** Tài khoản `BANNED`, email ngoài OU hoặc chưa xác minh không dùng được social API kể cả khi có JWT.
 - **AC10:** Quên/đổi mật khẩu chưa triển khai trong T03. Tài khoản OTP cũ chưa có mật khẩu cần quyết định chuyển đổi riêng, không tự xóa hoặc dùng đăng ký lại để thay mật khẩu.
+- **AC11 (T05):** UI theo [baseline đã duyệt](fe-templates/README.md), bốn route `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`; dark/light, OTP paste/keyboard, loading/error/retry và chống submit trùng. Refresh khôi phục session, logout xóa cache; FORBIDDEN không vào protected route.
 
 ### US-02 — Tạo biệt danh (P0-P)
 - Lần đầu vào ứng dụng, hệ thống cấp biệt danh mặc định an toàn kiểu `OUer-1234`; có thể sửa trong màn hình cá nhân nhỏ.

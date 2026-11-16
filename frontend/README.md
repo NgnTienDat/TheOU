@@ -1,6 +1,6 @@
 ﻿# TheOU — Frontend
 
-Nền tảng T01: React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. Chưa triển khai đăng nhập, bảng tin hay bài viết.
+React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. T05-A có Auth/Profile UI local theo [prototype đã duyệt](../docs/fe-templates/README.md); chưa triển khai bảng tin hoặc bài viết. Chưa nghiệm thu Cloud T05-B.
 
 ## Chạy tại máy
 
@@ -27,13 +27,18 @@ npm test
 npm run build
 ```
 
-`npm test` dùng test runner tích hợp của Node.js, chưa cần thêm framework. Test hiện kiểm tra ranh giới cấu hình môi trường, không kết nối Supabase thật. Build cần cấu hình công khai hợp lệ; CI dùng dữ liệu giả và không deploy.
+`npm test` dùng test runner Node, mock Auth/API/session; không kết nối Supabase thật. Build cần cấu hình công khai hợp lệ; CI dùng dữ liệu giả và không deploy.
+
+`npm run test:ui` dùng dev dependency `playwright-core` (đã pin trong lockfile) với Edge có sẵn trên Windows. Hệ khác đặt `THEOU_BROWSER_PATH` tới Chromium/Edge; script không tải browser. Vite riêng trên 127.0.0.1:5188 dùng env giả, mọi Auth/API được mock và host ngoài allowlist bị chặn. Không đọc email/mật khẩu thật. Ảnh kiểm tra nằm trong `node_modules/.cache/theou-ui/`, không commit. Script kiểm tra tương tác, responsive/dark-light và đối chiếu kích thước/tokens với HTML gốc; không thay thế kiểm thử Cloud hoặc screen reader thật.
+
+Bốn route: `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`; `/` tạm chuyển về cá nhân. Để kiểm thử Cloud sau review, cần deploy action updateNickname theo [bàn giao T05-A](../docs/reports/T05-A-IMPLEMENTATION.md). Phiên do Supabase SDK quản lý, email chờ xác minh lưu tạm sessionStorage; không tự lưu password/OTP/JWT vào storage riêng.
 
 ## Tổ chức mã nguồn
 
 - `src/app/`: ghép Router và Query provider; tắt retry tự động mặc định, mỗi nghiệp vụ quyết định retry sau.
-- `src/features/{auth,feed,posts,comments,votes,profile,moderation}/`: thư mục giữ chỗ bằng `.gitkeep`, chưa có nghiệp vụ.
-- `src/shared/api/SocialApiClient.ts`: interface và DTO theo tài liệu 06; chưa có adapter gọi API.
+- `src/features/auth/`: Auth service, session controller/provider, validation, Auth layout và ba trang đăng nhập/đăng ký/OTP.
+- `src/features/profile/`: trang cá nhân và đổi nickname; các feature khác vẫn giữ chỗ.
+- `src/shared/api/`: interface/DTO và adapter gọi getMe/updateNickname qua Edge; validate envelope/allowlist và lọc lỗi an toàn.
 - `src/shared/lib/`: kiểm tra env và `getSupabaseClient()` tạo một client khi cần; component UI không import SDK trực tiếp.
 - `src/shared/components/`, `src/shared/constants/`: chỗ đặt thành phần dùng chung khi có nhu cầu.
 - `tests/`: unit test; được kiểm tra kiểu bởi `tsconfig.node.json`.

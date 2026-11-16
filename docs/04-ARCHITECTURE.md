@@ -101,7 +101,7 @@ TheOU/
 └── README.md
 ```
 
-Các thư mục feature, components/constants chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04-A có `social-api/index.ts` khởi động Deno, `handler.ts` dispatch, `modules/profile/` cho getMe và `shared/` cho guard/errors/validation/client. Chưa có action nghiệp vụ khác hoặc deployment Cloud.
+Các thư mục feature, components/constants chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04 có `social-api/index.ts` khởi động Deno, `handler.ts` dispatch, `modules/profile/` cho getMe và `shared/` cho guard/errors/validation/client. T04 đã nghiệm thu getMe trên Cloud; T05-A thêm updateNickname local, chưa deploy, chưa có action post/comment/media.
 
 **Quyết định T04-A:** gateway giữ `verify_jwt = true`; handler gọi `auth.getUser(token)` bằng publishable client để xác minh với Auth server. Chỉ sau khi email chính xác domain OU và đã xác minh mới khởi tạo client đặc quyền, đọc profile bằng ID từ Auth, chặn BANNED rồi đọc ADMIN từ `user_roles`. Các lượt đọc profile/role này là một phần authorization bắt buộc vì T02 khóa raw tables đối với user client. Client đặc quyền không nhận session/Authorization từ request.
 
@@ -110,6 +110,8 @@ Profile thiếu được insert bằng `upsert(..., { onConflict: 'id', ignoreDu
 T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanStack Query provider với retry mặc định tắt. `shared/lib/supabase.ts` cung cấp `getSupabaseClient()` khởi tạo khi cần từ env; dev/build kiểm tra URL và publishable key trước khi đóng gói. Không dùng JWT anon legacy hoặc key đặc quyền trong frontend. `.env.local` được Vite đọc tự động và không commit. Unit test dùng Node.js test runner tích hợp để tránh thêm dependency chỉ phục vụ nền tảng.
 
 ## 5. Ranh giới frontend và API
+
+**T05-A local:** UI theo [baseline](fe-templates/README.md). Feature Auth chứa service, session controller/provider và bốn trang; shared API adapter validate envelope/DTO. SDK tự quản lý session, listener chỉ chuyển state đồng bộ rồi tải getMe ngoài callback; không lưu token riêng. Cache profile gắn với phiên, xóa khi đổi user/logout/401/403; protected route chờ Auth và getMe. SessionStorage chỉ giữ email/thời điểm chờ xác minh, localStorage chỉ thêm theme preference. `updateNickname` dùng lại guard/module profile, chưa deploy.
 
 - UI dùng hooks (`useFeed`, `useCreatePost`, `useComments`, `useToggleVote`) gọi `postApi`, `commentApi`, ...
 - Adapter hiện tại gọi `supabase.functions.invoke('social-api', { body: { action, payload } })`.

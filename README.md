@@ -8,10 +8,12 @@
 
 **T03 — COMPLETED 16/11/2026:** đăng ký email OU + mật khẩu → OTP xác minh; đăng nhập mật khẩu, passwordless bị chặn phía server. Offline gần nhất 47/47 PASS; signup/OTP sau đổi settings được theo dõi tại T05 khi có OU account mới. Xem [nghiệm thu T03](docs/reports/T03-STATUS-REPORT.md).
 
-**T04-B đang kiểm thử:** chủ dự án đã deploy; getMe hai lần PASS. Runner đã tách handler/gateway, bỏ suy luận mọi Set-Cookie là tạo session và kiểm tra phiên ban đầu không đổi; typecheck và offline 87/87 PASS. Chờ chạy lại Cloud, T04 chưa COMPLETED. Xem [T04-A](docs/reports/T04-A-IMPLEMENTATION.md), [runner T04-B.1](docs/reports/T04-B1-RUNNER.md).
+**T04 — COMPLETED — PASS 16/11/2026:** social-api/getMe đã deploy, smoke và BANNED/ADMIN/RACE Cloud PASS theo chủ dự án; cleanup khớp baseline. Offline gần nhất 99/99 PASS. Xem [nghiệm thu T04](docs/reports/T04-STATUS-REPORT.md).
 **Sản phẩm:** Mạng xã hội độc lập cho cộng đồng sở hữu email OU; không đại diện hay được bảo trợ bởi Trường Đại học Mở TP.HCM.
 
 ## Cấu trúc repository và chạy frontend
+
+**T05 UI baseline đã duyệt:** xem [prototype và conventions](docs/fe-templates/README.md). T05-A triển khai local login `/dang-nhap`, signup `/dang-ky`, OTP `/xac-thuc`, profile `/ca-nhan`; chưa nghiệm thu Cloud. T01–T04 giữ trạng thái đã nghiệm thu theo kế hoạch.
 
 ```text
 TheOU/

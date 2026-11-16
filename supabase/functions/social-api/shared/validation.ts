@@ -1,6 +1,23 @@
 import { ApiError } from './response.ts'
 
-export async function validateRequest(request: Request): Promise<void> {
+export type SocialRequest = { action: 'getMe'; payload: Record<string, never> } | {
+  action: 'updateNickname'
+  payload: { nickname: string }
+}
+
+export function validateNickname(value: unknown): string {
+  if (typeof value !== 'string' || /[\p{Cc}\p{Cf}]/u.test(value)) {
+    throw new ApiError('VALIDATION_ERROR')
+  }
+  const nickname = value.trim()
+  if (
+    [...nickname].length < 3 || [...nickname].length > 30 ||
+    /(?:https?:\/\/|www\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?:\b|\/))/iu.test(nickname)
+  ) throw new ApiError('VALIDATION_ERROR')
+  return nickname
+}
+
+export async function validateRequest(request: Request): Promise<SocialRequest> {
   if (
     request.method !== 'POST' ||
     request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
@@ -39,11 +56,19 @@ export async function validateRequest(request: Request): Promise<void> {
     throw new ApiError('VALIDATION_ERROR')
   }
   if (
-    !isObject(body) || Object.keys(body).length !== 2 || body.action !== 'getMe' ||
-    !isObject(body.payload) || Object.keys(body.payload).length !== 0
+    !isObject(body) || Object.keys(body).length !== 2 || !isObject(body.payload)
   ) {
     throw new ApiError('VALIDATION_ERROR')
   }
+  if (body.action === 'getMe' && Object.keys(body.payload).length === 0) {
+    return { action: 'getMe', payload: {} }
+  }
+  if (
+    body.action === 'updateNickname' && Object.keys(body.payload).length === 1 && 'nickname' in body.payload
+  ) {
+    return { action: 'updateNickname', payload: { nickname: validateNickname(body.payload.nickname) } }
+  }
+  throw new ApiError('VALIDATION_ERROR')
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

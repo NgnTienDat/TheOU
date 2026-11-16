@@ -60,6 +60,8 @@ export interface CreateCommentInput {
 
 // Hợp đồng T01; adapter gọi Edge Function sẽ được bổ sung cùng các task nghiệp vụ.
 export interface SocialApiClient {
+  getMe(): Promise<Me>
+  updateNickname(nickname: string): Promise<{ nickname: string }>
   listPosts(input: ListPostsInput): Promise<Page<PostPublic>>
   getPost(postId: string): Promise<PostPublic>
   createPost(input: CreatePostInput): Promise<{ postId: string; status: 'DRAFT' }>
@@ -67,4 +69,10 @@ export interface SocialApiClient {
   listComments(postId: string, cursor?: string): Promise<Page<CommentPublic>>
   createComment(input: CreateCommentInput): Promise<CommentPublic>
   setUpvote(postId: string, desiredState: boolean): Promise<{ hasUpvoted: boolean; upvoteCount: number }>
+}
+
+export interface Me {
+  nickname: string
+  emailMasked: string
+  isAdmin: boolean
 }

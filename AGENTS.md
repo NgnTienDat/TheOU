@@ -22,6 +22,7 @@
 - Không dùng dữ liệu cá nhân thật trong seed và ảnh chụp màn hình.
 
 ## Quy tắc triển khai
+- Mọi task frontend phải tham khảo UI conventions và prototype đã duyệt tại `docs/fe-templates/README.md`; giữ thiết kế, thay hành vi demo bằng nghiệp vụ thật.
 - Kiến trúc theo feature, không gọi Supabase trực tiếp trong component UI.
 - Mọi thay đổi DB dùng `supabase/migrations/` và có thể chạy lại trên môi trường sạch.
 - Chia `social-api` thành module theo nghiệp vụ, không nhồi tất cả logic vào một file.

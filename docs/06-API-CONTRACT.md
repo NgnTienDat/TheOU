@@ -121,11 +121,13 @@ Với `listPosts`, tag `null` = tất cả; `HOT` chỉ lấy bài `publishedAt 
 
 ### Phạm vi triển khai T04-A — chỉ `getMe`
 
+**Mở rộng local T05-A:** thêm `updateNickname` với payload chỉ `{nickname:string}`; trim, 3–30 Unicode code points, cấm URL/ký tự điều khiển. Guard OU/confirmed/ACTIVE như getMe; UPDATE filter ID từ Auth và status ACTIVE, chỉ đổi nickname. Data chỉ `{nickname}`; không nhận userId/role/status. Không migration/grants mới; chưa deploy action. Frontend gọi adapter, không truy cập bảng trực tiếp.
+
 POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field thừa ở envelope/payload, body tối đa 4 KiB. Action khác hoặc request/method/content-type sai trả VALIDATION_ERROR/400. Guard từ chối JWT thiếu/sai/hết hạn bằng UNAUTHENTICATED/401; email ngoài OU/chưa xác minh hoặc BANNED bằng FORBIDDEN/403. Lỗi Auth/DB hệ thống trả INTERNAL_ERROR/500 với thông báo chung; không đưa response gốc vào details/log.
 
 Data đúng ba trường `{ "nickname": "OUer-1234", "emailMasked": "***@ou.edu.vn", "isAdmin": false }`, không trả UUID/email đầy đủ/metadata. EmailMasked chỉ thuộc chính chủ; che toàn bộ local part để không lộ MSSV. Profile thiếu được insert an toàn, giữ hàng thắng khi concurrent/retry; profile đã tồn tại không bị thay đổi. Role ADMIN chỉ đọc từ DB.
 
-OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend cần xử lý lỗi gateway riêng. Các action còn lại trong bảng mục 3 là thiết kế, chưa triển khai.
+OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend xử lý lỗi gateway riêng. Ngoài getMe và updateNickname local T05-A, các action còn lại trong bảng mục 3 là thiết kế, chưa triển khai.
 
 ## 4. Các thao tác cần atomic và idempotent
 
@@ -199,7 +201,7 @@ Các phương thức còn lại tuân theo cùng mẫu. `SupabaseSocialApiClient
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
-T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04-A có getMe/guard và tests HTTP offline, chưa deploy Edge Cloud. Khi triển khai T04-B/T06/T08/T11 phải thêm test với phiên thật theo phạm vi: getMe chính chủ; A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
+T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04 đã nghiệm thu getMe/guard trên Cloud và BANNED/ADMIN/RACE; updateNickname T05-A hiện chỉ local. Khi triển khai T05-B/T06/T08/T11 phải thêm test với phiên thật theo phạm vi: updateNickname chính chủ; A tạo/xóa nội dung của mình, B không xóa được; không nhận `authorId` từ payload; DTO của nhiều bài ẩn danh không lộ khóa nối tác giả; nhãn `Chủ bài` được tính phía server. Test CRUD bằng service-role của T02 không thay thế các test này. Các lỗi SQL/constraint trong migration chỉ phục vụ server, phải được map sang mã lỗi/message an toàn ở adapter/Edge Function.
 
 Pseudocode chung:
 

@@ -67,6 +67,8 @@ Tất cả là **giả thuyết phải kiểm chứng**, không phải dữ li�
 
 ## 6. Quy tắc nghiệp vụ chính
 
+UI Authentication T05 dùng [prototype được duyệt](fe-templates/README.md): login/signup/OTP xác minh/profile; không có preview hoặc đăng nhập mock trong sản phẩm. Bản T05-A local chưa thay thế regression signup/OTP Cloud sau khi tắt passwordless.
+
 - Chỉ người có phiên hợp lệ, **email đã được xác minh**, domain OU hợp lệ và tài khoản `ACTIVE` được gọi social API.
 - Đăng ký: email OU + mật khẩu → OTP 6 số xác minh email → tài khoản được xác minh. Bật Confirm email; trước OTP không cấp session và không cho đăng nhập bằng mật khẩu.
 - Đăng nhập: email + mật khẩu, không gửi hoặc yêu cầu OTP. Mật khẩu sai không tạo session; không phân biệt công khai tài khoản không tồn tại với sai mật khẩu.
