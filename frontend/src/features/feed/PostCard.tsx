@@ -4,8 +4,10 @@ import { relativeTime } from '../../shared/lib/time.ts'
 import { Link } from 'react-router'
 import { Icon } from '../../shared/components/Icon.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
+import { useToggleUpvote } from '../votes/useToggleUpvote.ts'
 export function PostCard({ post, detailLink = false }: { post: PostPublic; detailLink?: boolean }) {
   const { notify } = useAuth()
+  const vote = useToggleUpvote(post)
   return <article className={`card post-card${detailLink ? ' post-card-linked' : ''}`} aria-label={`Bài viết ${postTags[post.tag]}`}>
     <div className={`post-avatar${post.displayMode === 'NICKNAME' ? ' nickname' : ''}`} aria-hidden="true">{post.displayMode === 'ANONYMOUS' ? <Icon name="anon" /> : 'OU'}</div>
     <div className="post-content-column">
@@ -20,13 +22,14 @@ export function PostCard({ post, detailLink = false }: { post: PostPublic; detai
     <div className="post-meta"><span className="post-tag">#{postTags[post.tag]}</span>{post.isMine && <span className="owner-pill">Bài của bạn</span>}
     {post.contactUrl && <a className="contact-link" href={post.contactUrl} target="_blank" rel="noopener noreferrer">Liên hệ người đăng <span className="sr-only"> (mở tab mới)</span></a>}</div>
     <footer className="post-stats" aria-label="Số liệu bài viết và liên kết">
-      <span className="post-stat" aria-label={`${post.upvoteCount} lượt bình chọn${post.hasUpvoted ? ', bạn đã bình chọn' : ''}; chỉ đọc, chưa hỗ trợ bình chọn`} title="Chỉ đọc — bình chọn chưa được triển khai"><Icon name="heart" /><span>{post.upvoteCount}</span><span className="sr-only"> bình chọn</span></span>
+      <button type="button" className="post-stat upvote-button" aria-pressed={vote.hasUpvoted} aria-busy={vote.pending} aria-label={vote.hasUpvoted ? 'Bỏ upvote bài viết' : 'Upvote bài viết'} title={`${vote.upvoteCount} lượt bình chọn`} disabled={vote.pending || !!vote.error} onClick={() => void vote.toggle()}>{vote.pending ? <span className="spinner" aria-hidden="true" /> : <Icon name="heart" />}<span>{vote.upvoteCount}</span><span className="sr-only"> bình chọn</span></button>
       <span className="post-stat"><Icon name="message" /><span>{post.commentCount}</span><span className="sr-only"> bình luận</span></span>
       <button type="button" className="icon-button post-share" aria-label="Sao chép liên kết bài" title="Sao chép liên kết bài" onClick={async () => {
         try { await navigator.clipboard.writeText(new URL(`/bai-viet/${post.id}`, location.origin).href); notify('Đã sao chép liên kết bài viết.') }
         catch { notify('Không thể sao chép tự động. Mở bài viết và sao chép liên kết trên thanh địa chỉ.') }
       }}><Icon name="share" /></button>
     </footer>
+    {vote.error && <div className="vote-error" role="alert"><p>{vote.error} Chưa xác nhận kết quả bình chọn.</p><button type="button" className="ghost" disabled={vote.pending} onClick={() => void vote.retry()}>Thử lại bình chọn</button></div>}
     </div>
   </article>
 }

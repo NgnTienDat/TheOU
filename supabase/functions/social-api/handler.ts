@@ -3,6 +3,7 @@ import { getMe, getOrCreateProfile } from './modules/profile/get-me.ts'
 import { updateNickname } from './modules/profile/update-nickname.ts'
 import { createPost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
 import { createComment, deleteComment, listComments } from './modules/comments/comment-service.ts'
+import { toggleUpvote } from './modules/votes/vote-service.ts'
 import { authenticate } from './shared/authentication.ts'
 import { authorizeAccount } from './shared/authorization.ts'
 import { ApiError, failure, success } from './shared/response.ts'
@@ -56,6 +57,9 @@ export function createSocialApiHandler(deps: Dependencies) {
       }
       if (body.action === 'createPost') {
         return success(await createPost(ctx, body.payload), requestId, headers)
+      }
+      if (body.action === 'toggleUpvote') {
+        return success(await toggleUpvote(ctx, body.payload), requestId, headers)
       }
       if (body.action === 'publishPost') {
         return success(await publishPost(ctx, body.payload.postId), requestId, headers)

@@ -50,7 +50,7 @@ flowchart TD
 
 Đây là một **backend nhẹ**, không phải lựa chọn “không backend”. Sau này NestJS sẽ thay chính lớp này.
 
-## 4. Tổ chức mã nguồn T01–T08-A
+## 4. Tổ chức mã nguồn T01–T09-A
 
 ```text
 TheOU/
@@ -101,7 +101,7 @@ TheOU/
 └── README.md
 ```
 
-Các thư mục feature chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Tests frontend ở `frontend/tests/`, DB/Auth/API ở `supabase/tests/`. T04–T07 đã nghiệm thu getMe/updateNickname, Post API và Feed/Composer. T08-A thêm `modules/comments/` và frontend detail/comments local; chưa có vote mutation/media/moderation. `index.ts` khởi động Deno, `handler.ts` dispatch và tái sử dụng shared guard/errors/client/CORS.
+Các thư mục feature chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Tests frontend ở `frontend/tests/`, DB/Auth/API ở `supabase/tests/`. T01–T08 và UI-V2 đã nghiệm thu. T09-A thêm `modules/votes/`, frontend `features/votes/` và trigger count local; chưa deploy upvote hoặc triển khai media/moderation. `index.ts` khởi động Deno, `handler.ts` dispatch và tái sử dụng shared guard/errors/client/CORS.
 
 **Quyết định T04-A:** gateway giữ `verify_jwt = true`; handler gọi `auth.getUser(token)` bằng publishable client để xác minh với Auth server. Chỉ sau khi email chính xác domain OU và đã xác minh mới khởi tạo client đặc quyền, đọc profile bằng ID từ Auth, chặn BANNED rồi đọc ADMIN từ `user_roles`. Các lượt đọc profile/role này là một phần authorization bắt buộc vì T02 khóa raw tables đối với user client. Client đặc quyền không nhận session/Authorization từ request.
 
@@ -117,7 +117,7 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 
 Adapter của phiên ready giữ Authorization đã chụp trong closure bộ nhớ, tránh SDK lấy nhầm JWT tài khoản khác cho request trễ; timeout 15 giây không đồng nghĩa server rollback. `createPostSubmission` khóa snapshot canonical và UUID trước await; tạo draft ACK mới publish, retry có postId chỉ publish. React dùng external store để phản ánh trạng thái; không component nào gọi SDK trực tiếp. Sau publish, invalidate/bỏ feed cache của scope, về `/` mặc định NEW. Không persist draft/UUID/postId hoặc thêm token vào storage; reload/rời Composer/Auth revalidation có thể mất trạng thái, chưa có recovery qua server. Xem [bàn giao T07-A](reports/T07-A-IMPLEMENTATION.md).
 
-- UI dùng hook `useFeed` và controller `createPostSubmission` gọi `createSocialApi`; comment/vote hooks chưa triển khai.
+- UI dùng `useFeed`, comment query/submission và `useToggleUpvote` qua `createSocialApi`; không gọi SDK trong PostCard.
 - Adapter hiện tại gọi `supabase.functions.invoke('social-api', { body: { action, payload } })`.
 - Các interface TypeScript và response model theo `06-API-CONTRACT.md`, không lộ kiểu dữ liệu Supabase vào UI.
 - Supabase Auth SDK chỉ ở module `auth`, **không** gọi bảng nghiệp vụ bằng `.from(...)` ở frontend.
@@ -128,6 +128,16 @@ Adapter của phiên ready giữ Authorization đã chụp trong closure bộ nh
 Migration `20261117024216_t08_atomic_comments.sql` dùng AFTER row trigger cập nhật count bằng delta cùng transaction; parent phải PUBLISHED khi tăng. Không giữ parent lock trước kiểm tra unique conflict của INSERT, không RPC public. Trạng thái DELETED không được phục hồi. Backfill count từ VISIBLE chỉ sửa hàng lệch khi đã khóa writes comments/posts; không reset tùy tiện.
 
 Frontend thêm PostDetailPage và `features/comments/`: query theo scope/postId, client runtime DTO allowlist, snapshot/key retry comment trong bộ nhớ, xóa có điều kiện/confirm và refetch counts từ server. PostCard trên Feed chỉ link phần nội dung tới detail, contact giữ link riêng. Response muộn bỏ theo AbortSignal/scope/mount; parent NOT_FOUND chặn tương tác. Không thay Auth/T07 create→publish hoặc thêm vote/media/admin. Chi tiết và giới hạn Cloud locking ở [bàn giao T08-A](reports/T08-A-IMPLEMENTATION.md).
+
+### T09-A — Upvote local, chưa deploy
+
+`modules/votes/` validate đúng postId/desiredState, dùng guard hiện tại và chỉ cho parent PUBLISHED. True dùng INSERT ON CONFLICT DO NOTHING, false DELETE theo post/caller; private AFTER trigger cập nhật count cùng transaction với row thực sự thay đổi. Không SELECT count rồi UPDATE tại Edge, không RPC public hay grants client mới.
+
+Sau mutation, một SELECT nhúng vote lọc theo caller lấy count/state cùng snapshot rồi chỉ map hai field công khai. Request mutation và SELECT response là hai transaction riêng: thay đổi khác có thể đã diễn ra trước SELECT; kết quả là trạng thái DB lúc đọc, không phải cam kết last-request-wins. Nếu parent mất PUBLISHED sau mutation, response có thể NOT_FOUND dù mutation đã commit; retry vẫn giữ desiredState.
+
+Frontend dùng MutationCache của QueryClient hiện có, key theo generation phiên/post; chặn pending trùng đồng bộ. Optimistic chỉ patch hai field vote của post mục tiêu trong Feed/Detail, giữ pages/cursors/thứ tự. Snapshot theo object và dấu refetch tránh rollback/response cũ đè dữ liệu mới, kể cả structural sharing giữ nguyên reference. Detail mở lúc request pending hiển thị cùng intent. Sau settle refetch Detail; chờ các vote đang pending trong scope rồi invalidate NEW và reset HOT từ cursor null, không tự sort. Lỗi giữ intent để retry cùng desiredState, không persist; Auth clear cache và scope guard loại response phiên cũ.
+
+Migration mới `20261117094304_t09_atomic_upvotes.sql` và giới hạn khóa/concurrency được mô tả trong [báo cáo T09-A](reports/T09-A-IMPLEMENTATION.md). PGlite kiểm tra SQL/rollback; PostgreSQL Cloud contention/parent race còn chờ T09-B.
 
 ## 6. Luồng xác thực
 

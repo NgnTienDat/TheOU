@@ -1,6 +1,6 @@
 ﻿# TheOU — Frontend
 
-React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. T01–T08 đã nghiệm thu; UI theo [conventions đã duyệt](../docs/fe-templates/README.md). **UI-V2 COMPLETED — PASS (17/11/2026)** sau visual review và Cloud read-only regression do chủ dự án xác nhận. T09 READY / NOT STARTED; lượt chốt chỉ cập nhật tài liệu, không gọi Cloud.
+React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supabase SDK. T01–T08 đã nghiệm thu; UI theo [conventions đã duyệt](../docs/fe-templates/README.md). **UI-V2 COMPLETED — PASS (17/11/2026)** sau visual review và Cloud read-only regression do chủ dự án xác nhận. **T09-A local completed / pending review**: upvote thật đã triển khai local, chưa deploy hoặc gọi Cloud. Xem [báo cáo T09-A](../docs/reports/T09-A-IMPLEMENTATION.md).
 
 ## Chạy tại máy
 
@@ -30,6 +30,7 @@ npm run build
 npm run test:ui
 npm run test:ui:feed
 npm run test:ui:comments
+npm run test:ui:votes
 ```
 
 `npm test` dùng test runner Node, mock Auth/API/session; không kết nối Supabase thật. Build cần cấu hình công khai hợp lệ; CI dùng dữ liệu giả và không deploy.
@@ -44,9 +45,13 @@ Bảy route: `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`, `/` (Feed), `/ba
 
 Comments chỉ đọc trên post PUBLISHED, một tầng ASC; form1–500 Unicode code points, retry giữ snapshot/key trong bộ nhớ. Xóa chính chủ có confirm; chưa rõ kết quả không giả thành success. Sau write refetch comments/detail/feed counts từ API, không tự cộng/trừ. Query key gắn postId/scope; parent NOT_FOUND chặn tương tác, response trễ bị bỏ. Rời/reload/Auth unmount chưa khôi phục text/key; không persist comment nhạy cảm. T08 đã nghiệm thu API/UI/Cloud; UI-V2 chỉ thay giao diện local, không deploy lại backend. Xem [nghiệm thu T08](../docs/reports/T08-STATUS-REPORT.md).
 
-Feed dùng opaque cursor, limit20, cache tách sort/tag/generation phiên; logout/account change xóa cache và bỏ response trễ. Post Composer T07 giữ key/payload/postId khi retry, chỉ publish success mới về Feed NEW; behavior đó giữ nguyên ở T08. Chưa có vote/media/deletePost/moderation UI. Giới hạn reload/Back–Forward recovery của Composer vẫn theo [T07-A](../docs/reports/T07-A-IMPLEMENTATION.md).
+Feed dùng opaque cursor, limit20, cache tách sort/tag/generation phiên; logout/account change xóa cache và bỏ response trễ. Post Composer T07 giữ key/payload/postId khi retry, chỉ publish success mới về Feed NEW; behavior đó giữ nguyên ở T08. Upvote T09-A đã có local; chưa có media/deletePost/moderation UI. Giới hạn reload/Back–Forward recovery của Composer vẫn theo [T07-A](../docs/reports/T07-A-IMPLEMENTATION.md).
 
 ## Tổ chức mã nguồn
+
+T09-A giữ API trong adapter: `setUpvote(postId,desiredState)` gọi action `toggleUpvote`, validate response đúng hai field, không đọc bảng vote từ browser. MutationCache chung chặn pending trùng post/scope; optimistic cập nhật Feed/Detail, rollback chỉ snapshot chưa bị thay/refetch, retry giữ cùng desiredState sau lỗi/timeout. Detail mở trong khi request đang chờ giữ cùng intent. Success refetch dữ liệu; NEW giữ thứ tự, HOT reset từ cursor null sau khi các vote pending trong scope kết thúc. Reload mất intent chưa ACK; không ghi intent/JWT vào storage hoặc hứa last-request-wins giữa nhiều tab.
+
+`test:ui:votes` chạy Vite127.0.0.1:5191 với Auth/API mock, chặn Cloud. Kiểm tra optimistic/double-click, Feed→Detail lúc pending, keyboard/aria, rollback, lost ACK retry, HOT reset và logout/account switch. Chụp20 ảnh360/390/768/1280px dark/light ở `node_modules/.cache/theou-votes-ui/`; không thay kiểm thử thiết bị/Cloud thật.
 
 - `src/app/`: ghép Router và Query provider; tắt retry tự động mặc định, mỗi nghiệp vụ quyết định retry sau.
 - `src/features/auth/`: Auth service, session controller/provider, validation, Auth layout và ba trang đăng nhập/đăng ký/OTP.
@@ -54,7 +59,8 @@ Feed dùng opaque cursor, limit20, cache tách sort/tag/generation phiên; logou
 - `src/features/feed/`: FeedPage/PostCard, useFeed và cấu hình infinite query/dedupe.
 - `src/features/posts/`: Composer text, validation/payload canonical và controller create/publish/retry.
 - `src/features/posts/PostDetailPage.tsx`, `src/features/comments/`: detail, CommentList/Composer, query và submission controller.
-- `src/shared/api/`: interface/DTO và adapter chín action profile/post/comment; validate envelope/allowlist và lọc lỗi an toàn; gắn JWT phiên vào closure request, không đưa vào component.
+- `src/features/votes/`: useToggleUpvote và mutation dùng chung QueryClient, key scope/post, optimistic snapshots/rollback và giữ desiredState retry.
+- `src/shared/api/`: interface/DTO và adapter mười action profile/post/comment/vote; validate envelope/allowlist và lọc lỗi an toàn; gắn JWT phiên vào closure request, không đưa vào component.
 - `src/shared/lib/`: kiểm tra env và `getSupabaseClient()` tạo một client khi cần; component UI không import SDK trực tiếp.
 - `src/shared/components/AppFrame.tsx`, `Icon.tsx`, `src/shared/constants/posts.ts`: shell social rail/bottom nav, header/theme/footer, SVG dùng chung và mapping tag. AppFrame giữ nhánh Auth T05 khi nhận children từ AuthLayout.
 - `tests/`: unit test; được kiểm tra kiểu bởi `tsconfig.node.json`.

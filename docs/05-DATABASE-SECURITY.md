@@ -103,6 +103,16 @@ Dữ liệu nhạy cảm email vẫn ở `auth.users`, không nhân bản nếu 
 
 `id uuid PK`, `post_id uuid FK`, `author_id uuid FK` **bí mật**, `idempotency_key uuid NOT NULL`, `body varchar(500)`, `status ('VISIBLE','HIDDEN','DELETED')`, `created_at`, `updated_at`. Ràng buộc `UNIQUE(author_id,idempotency_key)` cho request retry. Không hỗ trợ nested reply nên không có `parent_id`. API chỉ trả `is_owner` đối với người hiện tại và `is_original_poster` đúng khi commenter là author của **post đó**; không gửi `author_id`.
 
+### T09-A — Atomic upvote local
+
+Migration riêng `20261117094304_t09_atomic_upvotes.sql` giữ nguyên T02/T03/T06/T08. Transaction khóa writes `post_votes` rồi `posts`, backfill chỉ count lệch COUNT(votes); không sửa vote rows/body/status/owner/published_at. Count lệch được sửa sẽ kích hoạt updated_at như quy tắc T02, không giữ giả timestamp cũ.
+
+`theou_private.sync_upvote_count()` là SECURITY INVOKER/search_path rỗng, chỉ service_role EXECUTE; không public RPC, không đổi table grants/RLS. AFTER INSERT/DELETE tăng/giảm bằng delta trên hàng parent, cùng transaction; unique conflict/no-row DELETE không chạy trigger. CHECK T02 chặn count âm, exception rollback cả vote/count. UPDATE vote keys bị trigger bất biến T02 chặn.
+
+AFTER giữ thứ tự child/unique → parent, tránh khóa parent trước unique conflict. FK lấy KEY SHARE trên parent; UPDATE chỉ count/updated_at không đổi khóa referenced nên dùng NO KEY UPDATE, tương thích KEY SHARE. UPDATE tăng chỉ khớp parent PUBLISHED và kiểm tra lại điều kiện khi chờ concurrent UPDATE: hide thắng trước thì INSERT rollback; vote thắng trước thì hide sau vẫn giữ count đúng số vote đã có. DELETE được giảm count cho parent private để hỗ trợ cleanup đặc quyền; API vẫn kiểm tra PUBLISHED trước/sau và không cho client xóa vote trên bài không được xem.
+
+Future moderation/cleanup nhiều bảng phải review thứ tự khóa (vote/comment → parent), không giữ parent rồi chờ child theo hướng ngược; deadlock có thể rollback transaction, không được giả success. Request true/false hỗn hợp theo DB execution, không last-request-wins. PGlite không chứng minh contention/locks thật; T09-B còn cần PostgreSQL Cloud integration. Không push migration trong T09-A.
+
 ### `post_votes`
 
 `post_id uuid FK`, `user_id uuid FK`, `created_at timestamptz`, PK `(post_id,user_id)`. Không có downvote. Đổi trạng thái vote phải atomic/idempotent theo request; tránh race giữa hai lần bấm.
