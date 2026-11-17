@@ -75,6 +75,7 @@ try {
   async function screenshots(name) {
     for (const width of [360, 390, 768, 1280]) for (const theme of ['dark', 'light']) {
       await page.setViewportSize({ width, height: width < 600 ? 912 : 960 })
+      if (name === 'profile') assert.equal(await page.getByRole('heading', { name: 'Cá nhân', exact: true }).count(), 1)
       if (await page.getAttribute('html', 'data-theme') !== theme) await page.getByRole('button', { name: /Chuyển giao diện/ }).click()
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'không tràn ngang')
       assert.equal(await page.locator('input').evaluateAll(inputs => inputs.every(e => e.labels?.length || e.getAttribute('aria-label'))), true, 'input có nhãn')
@@ -173,7 +174,7 @@ try {
   assert.deepEqual(pageErrors, [])
   const reference = await context.newPage()
   await reference.setContent(await readFile(join(root, '../docs/fe-templates/TheOU-T05-Authentication-Prototype.html'), 'utf8'))
-  for (const { name, width, theme, metrics } of visualMetrics) {
+  for (const { name, width, theme, metrics } of visualMetrics.filter(item => item.name !== 'profile')) {
     await reference.setViewportSize({ width, height: width < 600 ? 912 : 960 })
     await reference.evaluate(({ name, theme }) => {
       document.documentElement.dataset.theme = theme
@@ -183,6 +184,6 @@ try {
   }
   await reference.close()
   console.log('PASS: UI offline — routes, Auth/OTP/profile, errors/403/401/retry, theme, double-submit, keyboard/paste; 32 screenshots ở 360/390/768/1280px dark/light.')
-  console.log('PASS: kích thước card/input, radius, panel và heading đối chiếu trực tiếp HTML prototype cho 32 trường hợp.')
+  console.log('PASS: kích thước card/input, radius, panel và heading đối chiếu HTML T05 cho 24 trường hợp Auth; 8 ảnh Profile dùng shell V2.')
   console.log('Ảnh dữ liệu giả: frontend/node_modules/.cache/theou-ui/ (gitignored). Không gọi Cloud.')
 } finally { await browser?.close(); server.kill() }

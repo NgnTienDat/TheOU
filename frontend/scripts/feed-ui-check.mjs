@@ -1,11 +1,12 @@
 // API/Auth giả lập toàn bộ; chặn mọi host ngoài Vite và host offline.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
 
+const prototype = await readFile(new URL('../../docs/fe-templates/TheOU-Social-UI-Redesign-V2.html', import.meta.url), 'utf8')
 const root = fileURLToPath(new URL('../', import.meta.url))
 const artifacts = join(root, 'node_modules/.cache/theou-feed-ui')
 const origin = 'http://127.0.0.1:5189'
@@ -43,10 +44,12 @@ try {
   browser = await chromium.launch({ executablePath: process.env.THEOU_BROWSER_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true })
   const context = await browser.newContext({ reducedMotion: 'reduce' })
   const page = await context.newPage()
+  page.setDefaultTimeout(10_000)
   const runtimeErrors = []
   page.on('pageerror', () => runtimeErrors.push('runtime error'))
   await context.route('**/*', async route => {
     const request = route.request(); const url = new URL(request.url())
+    if (url.origin === origin && url.pathname === '/__v2-reference.html') return route.fulfill({ contentType: 'text/html', body: prototype })
     if (url.origin === origin) return route.continue()
     if (url.origin !== 'https://offline.example.invalid') return route.abort()
     const input = request.postDataJSON() ?? {}; let body = {}; let status = 200
@@ -87,10 +90,30 @@ try {
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': '*', 'x-supabase-api-version': '2024-01-01' } })
   })
   await mkdir(artifacts, { recursive: true })
+  const reference = await context.newPage()
+  await reference.goto(`${origin}/__v2-reference.html`)
   async function screen(name, width, theme) {
     await page.setViewportSize({ width, height: width < 600 ? 860 : 960 })
     if (await page.getAttribute('html', 'data-theme') !== theme) await page.getByRole('button', { name: /Chuyển giao diện/ }).click()
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'không tràn ngang')
+    if (name === 'feed' || name === 'composer') {
+      assert.equal(await page.getByRole('heading', { name: name === 'feed' ? 'Bảng tin' : 'Viết bài', exact: true }).count(), 1)
+      await reference.setViewportSize({ width, height: width < 600 ? 860 : 960 })
+      await reference.evaluate(({ name, theme }) => { document.documentElement.dataset.theme = theme; location.hash = name === 'feed' ? '#/' : '#/viet-bai' }, { name, theme })
+      await reference.locator(name === 'feed' ? '#screen-feed.active' : '#screen-compose.active').waitFor()
+      const expected = await reference.evaluate(() => { const column = document.querySelector('.screen.active .column'); const style = getComputedStyle(column); return { width: column.getBoundingClientRect().width, bg: style.getPropertyValue('--bg').trim(), panel: style.getPropertyValue('--surface').trim(), fg: style.getPropertyValue('--text').trim(), muted: style.getPropertyValue('--muted').trim(), border: style.getPropertyValue('--border').trim() } })
+      const actual = await page.locator('.social-wrap').evaluate(column => { const style = getComputedStyle(column); return { width: column.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), bg: style.getPropertyValue('--bg').trim(), panel: style.getPropertyValue('--panel').trim(), fg: style.getPropertyValue('--fg').trim(), muted: style.getPropertyValue('--muted').trim(), border: style.getPropertyValue('--line').trim() } })
+      assert.deepEqual(actual, expected, `V2 tokens/column: ${name}/${width}/${theme}`)
+      assert.equal(await page.locator('.social-nav a').count(), 3)
+      assert.equal(await page.locator('.social-nav a[aria-current=page]').count(), 1)
+      assert.equal(await page.locator('a[href="/thanh-phan"],.preview-toggle').count(), 0)
+      if (width <= 720) assert.equal(await page.locator('.social-nav').evaluate(e => getComputedStyle(e).position), 'fixed')
+      else assert.equal(await page.locator('.social-navigation').evaluate(e => e.getBoundingClientRect().width), width > 1100 ? 92 : 66)
+      assert.equal(await page.locator('.post-card').evaluateAll(cards => cards.every(e => getComputedStyle(e).borderRadius === '0px')), true)
+      await reference.screenshot({ path: join(artifacts, `reference-${name}-${width}-${theme}.png`), fullPage: true })
+    }
+    await page.evaluate(() => scrollTo(0, 0))
+    if (width <= 720) assert.equal(await page.locator('.mobile-header').evaluate(e => e.getBoundingClientRect().y), 0)
     await page.screenshot({ path: join(artifacts, `${name}-${width}-${theme}.png`), fullPage: true, style: '.toast{visibility:hidden}' }); shots++
   }
   const feed = () => page.getByRole('heading', { name: 'Bảng tin', exact: true }).waitFor()
@@ -98,7 +121,7 @@ try {
   async function composer() { await page.getByRole('link', { name: 'Viết bài', exact: true }).click(); await page.getByLabel('Câu chuyện của bạn', { exact: true }).waitFor() }
   async function leave() {
     page.once('dialog', dialog => dialog.accept())
-    await page.getByRole('link', { name: 'Quay lại bảng tin', exact: true }).click(); await feed()
+    await page.getByRole('link', { name: 'Hủy', exact: true }).click(); await feed()
   }
   async function login() {
     await page.getByLabel('Email trường', { exact: true }).fill(user.email)
@@ -118,11 +141,13 @@ try {
   feedMode = 'many'; await page.getByRole('button', { name: 'Thử lại', exact: true }).click(); await page.locator('.post-card').first().waitFor()
   assert.equal(await page.locator('.post-card').count(), 2)
   assert.equal(await page.locator('.post-body').first().evaluate(e => getComputedStyle(e).whiteSpace), 'pre-wrap')
-  assert.equal(await page.locator('.post-card button').count(), 0, 'không fake vote/comment')
+  assert.equal(await page.locator('.post-card button').count(), 2, 'chỉ nút sao chép thật; số liệu vote/comment chỉ đọc')
+  assert.equal(await page.locator('.post-stat button,.post-stat[role=button]').count(), 0)
   assert.equal(await page.locator('.post-byline a').count(), 0, 'không link danh tính')
   assert.doesNotMatch(await page.locator('.feed-list').innerHTML(), new RegExp(`${user.id}|${user.email}|OUer riêng tư|author_id|access_token`))
   assert.equal(await page.getByRole('link', { name: /Liên hệ người đăng/ }).getAttribute('rel'), 'noopener noreferrer')
   for (const width of [360, 390, 768, 1280]) for (const theme of ['dark', 'light']) await screen('feed', width, theme)
+  console.log('PASS: V2 Feed tokens, responsive shell và ảnh đối chiếu prototype.')
   await page.setViewportSize({ width: 360, height: 860 })
   assert.equal(await page.locator('.tag-filters').evaluate(e => e.scrollWidth > e.clientWidth), true)
   for (const [label, value] of [['Confession', 'CONFESSION'], ['Review môn', 'REVIEW_MON'], ['Tài liệu', 'TAI_LIEU'], ['Tìm trọ', 'TIM_TRO'], ['Hỏi gấp', 'HOI_GAP'], ['Tất cả', null]]) {
@@ -131,6 +156,7 @@ try {
     await page.waitForFunction(() => !document.querySelector('.feed-list[aria-busy=true]'))
     assert.equal(listCalls.at(-1).tag, value); assert.equal(listCalls.at(-1).cursor, null)
   }
+  console.log('PASS: sáu tag filters.')
   await page.getByRole('button', { name: 'Nổi bật 24h', exact: true }).click(); await page.locator('.post-card').first().waitFor()
   assert.equal(listCalls.at(-1).sort, 'HOT'); assert.equal(listCalls.at(-1).cursor, null)
   await page.getByRole('button', { name: 'Tải thêm', exact: true }).click(); await page.waitForFunction(() => document.querySelectorAll('.post-card').length === 3)
@@ -143,8 +169,10 @@ try {
   feedMode = 'cursor-error'; await page.getByRole('button', { name: 'Tải thêm', exact: true }).click(); await page.getByText('Phiên phân trang không còn hợp lệ.', { exact: false }).waitFor()
   feedMode = 'many'; await page.getByRole('button', { name: 'Làm mới bảng tin', exact: true }).last().click(); await page.getByRole('button', { name: 'Tải thêm', exact: true }).waitFor(); assert.equal(listCalls.at(-1).cursor, null)
   feedMode = 'late'; holding = false
+  console.log('PASS: pagination/retry/reset; kiểm tra đổi filter khi response tới muộn.')
   await page.getByRole('button', { name: 'Confession', exact: true }).click()
-  while (!holding) await page.waitForTimeout(10)
+  for (let attempt = 0; attempt < 100 && !holding; attempt++) await page.waitForTimeout(10)
+  assert.ok(holding, 'request đổi filter đã tới mock trước khi chuyển sang tag khác')
   await page.getByRole('button', { name: 'Hỏi gấp', exact: true }).click(); await page.getByText('Chủ đề HOI_GAP', { exact: true }).waitFor()
   releaseList(); await page.waitForTimeout(50)
   assert.equal(await page.getByText('Chủ đề CONFESSION', { exact: true }).count(), 0)
@@ -153,7 +181,7 @@ try {
   feedMode = 'many'; await page.getByRole('button', { name: 'Thử lại', exact: true }).click(); await page.locator('.post-card').waitFor()
   await composer()
   assert.equal(await page.getByRole('radio', { name: /Ẩn danh/ }).isChecked(), true)
-  assert.equal(await page.getByLabel('Chủ đề', { exact: true }).inputValue(), 'CONFESSION')
+  assert.equal(await page.getByRole('radio', { name: 'Confession', exact: true }).isChecked(), true)
   await page.getByRole('button', { name: 'Đăng bài', exact: true }).click(); await page.getByText('Nội dung cần từ 1 đến 1.000 ký tự.', { exact: true }).waitFor()
   assert.equal(await page.getByLabel('Câu chuyện của bạn', { exact: true }).evaluate(e => e === document.activeElement), true)
   await page.getByLabel('Câu chuyện của bạn', { exact: true }).fill('👋'.repeat(1001)); await page.getByText('1001/1000', { exact: true }).waitFor()
@@ -164,12 +192,12 @@ try {
   await page.getByRole('button', { name: 'Đăng bài', exact: true }).scrollIntoViewIfNeeded()
   assert.equal(await page.getByRole('button', { name: 'Đăng bài', exact: true }).isVisible(), true)
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); assert.equal(new URL(page.url()).pathname, '/bai-viet/moi')
-  await page.getByLabel('Chủ đề', { exact: true }).selectOption('TAI_LIEU'); await page.getByRole('radio', { name: /Biệt danh/ }).check()
+  await page.getByRole('radio', { name: 'Tài liệu', exact: true }).check(); await page.getByRole('radio', { name: /Biệt danh/ }).check()
   const contact = page.getByLabel('Liên kết liên hệ', { exact: false })
   await contact.fill('https://zalo.me.evil.invalid/x'); await page.getByRole('button', { name: 'Đăng bài', exact: true }).click(); await page.getByText(/Dùng liên kết HTTPS/).waitFor(); assert.equal(createCalls.length, 0)
   await contact.fill('https://zalo.me/offline'); await page.getByRole('radio', { name: /Ẩn danh/ }).check(); assert.equal(await contact.count(), 0)
   await page.getByRole('radio', { name: /Biệt danh/ }).check(); assert.equal(await contact.inputValue(), '')
-  await contact.fill('https://m.me/offline'); await page.getByLabel('Chủ đề', { exact: true }).selectOption('CONFESSION'); assert.equal(await contact.count(), 0)
+  await contact.fill('https://m.me/offline'); await page.getByRole('radio', { name: 'Confession', exact: true }).check(); assert.equal(await contact.count(), 0)
   await page.getByRole('radio', { name: /Ẩn danh/ }).check()
   createMode = 'lost'
   await page.locator('.composer-card').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
@@ -187,6 +215,8 @@ try {
   await composer(); await page.getByLabel('Câu chuyện của bạn', { exact: true }).fill('Replay publish offline')
   await page.getByRole('button', { name: 'Đăng bài', exact: true }).click(); await page.getByRole('button', { name: 'Thử lại hoàn tất đăng bài', exact: true }).waitFor()
   const createBeforeRetry = createCalls.length
+  await page.setViewportSize({ width: 360, height: 600 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'retry publish không tràn mobile360')
   await page.getByRole('button', { name: 'Thử lại hoàn tất đăng bài', exact: true }).click(); await feed()
   assert.equal(createCalls.length, createBeforeRetry); assert.equal(publishCalls.at(-1), publishCalls.at(-2)); assert.notEqual(createCalls.at(-1).idempotencyKey, createCalls[0].idempotencyKey)
   createMode = 'conflict'; publishMode = 'normal'

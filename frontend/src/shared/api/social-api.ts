@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Me, Page, PostPublic, SocialApiClient } from './SocialApiClient.ts'
+import type { CommentPublic, Me, Page, PostPublic, SocialApiClient } from './SocialApiClient.ts'
 
 export type ClientErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_ERROR'
 const messages = {
@@ -20,10 +20,18 @@ function object(value: unknown): value is Record<string, unknown> {
 function keys(value: Record<string, unknown>, names: string[]) {
   return Object.keys(value).sort().join(',') === names.sort().join(',')
 }
-type ImplementedApi = Pick<SocialApiClient, 'getMe' | 'updateNickname' | 'createPost' | 'publishPost' | 'listPosts' | 'getPost'>
+type ImplementedApi = Omit<SocialApiClient, 'setUpvote'>
 type Action = keyof ImplementedApi
-type Data = Me | { nickname: string } | PostPublic | Page<PostPublic> | { postId: string; status: 'DRAFT' }
+type Data = Me | { nickname: string } | PostPublic | CommentPublic | Page<PostPublic> | Page<CommentPublic> | { success: true } | { postId: string; status: 'DRAFT' }
 const uuid = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
+function parseComment(value: unknown): CommentPublic {
+  if (!object(value) || !keys(value, ['id','postId','body','authorLabel','isOriginalPoster','isMine','createdAt']) ||
+    typeof value.id !== 'string' || !uuid.test(value.id) || typeof value.postId !== 'string' || !uuid.test(value.postId) ||
+    typeof value.body !== 'string' || [...value.body].length < 1 || [...value.body].length > 500 ||
+    typeof value.isOriginalPoster !== 'boolean' || typeof value.isMine !== 'boolean' || value.authorLabel !== (value.isOriginalPoster ? 'Chủ bài' : 'OUer ẩn danh') ||
+    typeof value.createdAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value.createdAt) || !Number.isFinite(Date.parse(value.createdAt))) throw new SocialApiError('INTERNAL_ERROR')
+  return { id: value.id, postId: value.postId, body: value.body, authorLabel: value.authorLabel as string, isOriginalPoster: value.isOriginalPoster, isMine: value.isMine, createdAt: value.createdAt }
+}
 function parsePost(value: unknown): PostPublic {
   if (!object(value) || !keys(value, ['id','tag','body','displayMode','authorLabel','contactUrl','publishedAt','upvoteCount','commentCount','hasUpvoted','isMine','images']) ||
     typeof value.id !== 'string' || !uuid.test(value.id) || typeof value.tag !== 'string' || !['CONFESSION','REVIEW_MON','TAI_LIEU','TIM_TRO','HOI_GAP'].includes(value.tag) ||
@@ -62,15 +70,21 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
   }
   const data = body.data
   if (status !== 200) throw new SocialApiError('INTERNAL_ERROR')
+  if (action === 'createComment') return parseComment(data)
+  if (action === 'deleteComment') {
+    if (!object(data) || !keys(data,['success']) || data.success !== true) throw new SocialApiError('INTERNAL_ERROR')
+    return { success: true }
+  }
   if (action === 'getPost' || action === 'publishPost') return parsePost(data)
   if (action === 'createPost') {
     if (!object(data) || !keys(data,['postId','status']) || typeof data.postId !== 'string' || !uuid.test(data.postId) || data.status !== 'DRAFT') throw new SocialApiError('INTERNAL_ERROR')
     return { postId:data.postId,status:'DRAFT' }
   }
-  if (action === 'listPosts') {
+  if (action === 'listPosts' || action === 'listComments') {
     if (!object(data) || !keys(data,['items','nextCursor']) || !Array.isArray(data.items) || data.items.length > 20 ||
       (data.nextCursor !== null && (typeof data.nextCursor !== 'string' || data.nextCursor.length < 1 || data.nextCursor.length > 1024))) throw new SocialApiError('INTERNAL_ERROR')
-    return { items:data.items.map(parsePost),nextCursor:data.nextCursor as string|null }
+    return action === 'listPosts' ? { items:data.items.map(parsePost),nextCursor:data.nextCursor as string|null }
+      : { items:data.items.map(parseComment),nextCursor:data.nextCursor as string|null }
   }
   if (status !== 200 || !object(data) || typeof data.nickname !== 'string' ||
     [...data.nickname].length < 3 || [...data.nickname].length > 30) throw new SocialApiError('INTERNAL_ERROR')
@@ -107,5 +121,16 @@ export function createSocialApi(client: SupabaseClient, accessToken?: string): I
     publishPost: async (postId) => await invoke('publishPost', { postId }) as PostPublic,
     listPosts: async (input) => await invoke('listPosts', input) as Page<PostPublic>,
     getPost: async (postId) => await invoke('getPost', { postId }) as PostPublic,
+    listComments: async (input) => {
+      const page = await invoke('listComments', input) as Page<CommentPublic>
+      if (page.items.some(comment => comment.postId !== input.postId)) throw new SocialApiError('INTERNAL_ERROR')
+      return page
+    },
+    createComment: async (input) => {
+      const comment = await invoke('createComment', input) as CommentPublic
+      if (comment.postId !== input.postId) throw new SocialApiError('INTERNAL_ERROR')
+      return comment
+    },
+    deleteComment: async (commentId) => await invoke('deleteComment', { commentId }) as { success: true },
   }
 }

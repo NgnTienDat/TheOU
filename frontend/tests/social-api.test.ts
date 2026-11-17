@@ -5,6 +5,24 @@ import { createSocialApi, parseSocialResponse, SocialApiError } from '../src/sha
 
 const me = { nickname: 'OUer offline', emailMasked: '***@ou.edu.vn', isAdmin: false }
 const envelope = (data: unknown) => ({ data, error: null, meta: { requestId: '00000000-0000-4000-8000-000000000001' } })
+const comment = { id:'10000000-0000-4000-8000-000000000010',postId:'10000000-0000-4000-8000-000000000001',body:'Bình luận offline',authorLabel:'Chủ bài',isOriginalPoster:true,isMine:false,createdAt:'2026-11-16T12:00:00.123456Z' }
+test('adapter ba comments actions gửi đúng payload, DTO bảy field và delete ACK',async()=>{
+  const calls:unknown[]=[]
+  const client=createClient('https://offline.example.invalid','sb_publishable_offline',{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:async(_url,init)=>{const body=JSON.parse(String(init?.body));calls.push(body);return Response.json(envelope(body.action==='listComments'?{items:[comment],nextCursor:null}:body.action==='createComment'?comment:{success:true}))}}})
+  const api=createSocialApi(client);const list={postId:comment.postId,cursor:null,limit:20};const create={postId:comment.postId,body:comment.body,idempotencyKey:comment.id}
+  assert.deepEqual(await api.listComments(list),{items:[comment],nextCursor:null});assert.deepEqual(await api.createComment(create),comment);assert.deepEqual(await api.deleteComment(comment.id),{success:true})
+  assert.deepEqual(calls,[{action:'listComments',payload:list},{action:'createComment',payload:create},{action:'deleteComment',payload:{commentId:comment.id}}])
+})
+test('Comment adapter từ chối identity/metadata/status/key, nhãn giả, oversized body và malformed ACK/page',()=>{
+  for(const changes of [{authorId:'private'},{email:'private@ou.edu.vn'},{userMetadata:{}},{status:'VISIBLE'},{idempotencyKey:comment.id},{authorLabel:'Nickname thật'},{body:'x'.repeat(501)},{isMine:'true'},{createdAt:'bad'}])
+    for(const action of ['createComment','listComments'] as const)assert.throws(()=>parseSocialResponse(envelope(action==='createComment'?{...comment,...changes}:{items:[{...comment,...changes}],nextCursor:null}),200,action),SocialApiError)
+  for(const data of [{success:false},{success:true,commentId:comment.id}])assert.throws(()=>parseSocialResponse(envelope(data),200,'deleteComment'),SocialApiError)
+})
+test('Comment response của post khác bị adapter từ chối',async()=>{
+  const client=createClient('https://offline.example.invalid','sb_publishable_offline',{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:async(_url,init)=>Response.json(envelope(JSON.parse(String(init?.body)).action==='listComments'?{items:[comment],nextCursor:null}:comment))}})
+  const api=createSocialApi(client);const wrong='20000000-0000-4000-8000-000000000001'
+  await assert.rejects(api.listComments({postId:wrong,cursor:null,limit:20}),SocialApiError);await assert.rejects(api.createComment({postId:wrong,body:'offline',idempotencyKey:comment.id}),SocialApiError)
+})
 test('adapter gắn JWT phiên lúc tạo, không dùng ngầm JWT hiện tại của SDK', async () => {
   const headers: string[] = []
   const client = createClient('https://offline.example.invalid', 'sb_publishable_offline', {

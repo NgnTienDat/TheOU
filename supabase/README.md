@@ -1,5 +1,25 @@
 # TheOU — Supabase Database, Auth và Social API
 
+## T08 — COMPLETED — PASS (17/11/2026)
+
+Comments API/UI đã nghiệm thu: frontend54/54 và Supabase179/179 offline PASS; deployment/manual/smoke/create/R1 đạt, chủ dự án xác nhận R2 cross-owner/concurrent delete/replay/atomic count cùng cleanup/SQL verification PASS. Final users2/profiles2/posts2 PUBLISHED/comments2 (VISIBLE1/DELETED1), counts1/0, mismatch0, fixtures0. **Giữ hai bài T07/hai comment thủ công T08; không chạy lại runner hoặc cleanup của run đã hoàn tất.** Xem [báo cáo cuối](../docs/reports/T08-STATUS-REPORT.md).
+
+Các mục R1/R2 bên dưới là snapshot hướng dẫn trước nghiệm thu; các số comments8/sáu fixture mô tả trước cleanup. T08-C chỉ đóng tài liệu, không kiểm tra lại Cloud hoặc sửa source. Các giới hạn và AUTH-ALIAS-001 vẫn được theo dõi; Social UI V2 chưa tích hợp vào React, không thuộc kết quả T08.
+
+## T08-B.5-R1/R2 — Snapshot trước nghiệm thu
+
+**R2 local đã sẵn sàng review, chưa chạy Cloud:** `--resume-delete <runId>` cần cờ riêng `THEOU_ALLOW_T08_RESUME_DELETES=theou-dev`; cờ write không thay thế. Guard chỉ cho delete đúng UUID `retry`/`parallel-b`, không create. Runner giữ nguyên ba artifact R1 và ghi `.r2.json` riêng theo từng nhóm INTENT/ACK/SQL verification; file tồn tại chặn chạy lại. Mất ACK/partial completion chỉ SELECT trạng thái thực rồi dừng, không tự replay batch. Offline hiện tại **179/179 PASS**. Chỉ chạy sau phê duyệt riêng theo mục11 của [báo cáo T08-B](../docs/reports/T08-B-CLOUD-TESTS.md); không chạy hoặc cleanup trong lượt chuẩn bị này.
+
+T01–T07 đã COMPLETED. T08-A thêm listComments/createComment/deleteComment, mapper bảy field/Chủ bài, cursor HMAC tái sử dụng THEOU_POST_CURSOR_SECRET và migration `20261117024216_t08_atomic_comments.sql`. Không thêm secret, public RPC hoặc mở raw-table grants/RLS. Migration cũ giữ nguyên. Count VISIBLE được đồng bộ/backfill chỉ hàng lệch và cập nhật delta cùng transaction; create cần parent PUBLISHED, own soft-delete/replay không trừ lặp. Xem [bàn giao T08-A](../docs/reports/T08-A-IMPLEMENTATION.md).
+
+Chủ dự án đã duyệt UI, xác nhận migration/ACL/RLS/deploy và manual Cloud E2E6/6 PASS. Controlled write run `3b72e32d09c641ff936c9b6562f800dd` đã tạo6 fixture rồi dừng ở assertion timestamp UTC của runner. Sau sửa, **R1 `--resume-read` PASS**, offline170/170 PASS; Cloud pagination/cursor/privacy/OP/isMine và cursor thật khác post đạt. SQL trước/sau không đổi: users2/profiles2/roles0/posts2/comments8 (VISIBLE7/DELETED1), counts7/0 và không mismatch. **Giữ hai post/hai comment cũ cùng sáu fixture; chưa concurrent delete/cleanup, T08 chưa COMPLETED.** Xem [T08-B Cloud tests](../docs/reports/T08-B-CLOUD-TESTS.md).
+
+**Không chạy lại `--write` hoặc `--smoke` với baseline hai comment cũ.** Mode `--resume-read <runId>` nạp đúng inventory đã validate, kiểm tra SQL exact scope/fingerprints và counts trước/sau; chỉ cho Auth login/logout/getUser và getMe/getPost/listComments, không save inventory hoặc chạy cleanup. R1 đã chạy bằng `npm.cmd run test:t08-cloud -- --resume-read 3b72e32d09c641ff936c9b6562f800dd` từ `supabase/`; Node nạp `.env.auth.local`, dùng publishable key và A/B T06 hiện có hoặc nhập ẩn, không cần cờ write. Auth login/logout vẫn có side effects phiên/last_sign_in. Inventory/verify/cleanup SQL nằm `.temp/t08-comments/<runId>.*` gitignored; giữ baseline gốc. R2 concurrent delete cần runner/review/phê duyệt riêng, chưa được triển khai trong R1. Không dùng cleanup T06, xóa theo domain/prefix hoặc reset count.
+
+**CLI Windows:** runner tự tìm native `supabase.exe` trên PATH, sau đó trong npm/npx cache với package đúng3.1.0; luôn xác nhận `--version`. Có thể để `THEOU_SUPABASE_CLI` rỗng nếu đã dùng `npx.cmd supabase@3.1.0`. Nếu cache chưa có, chủ dự án tự chạy `npx.cmd supabase@3.1.0 --version` hoặc chỉ rõ đường dẫn native `.exe`; runner không tự cài/cập nhật CLI. Không đặt biến này thành `npx.cmd`, `supabase.cmd` hoặc chuỗi command. Không dùng shell cho SQL. Lỗi mới có stage/code riêng (RESOLVE/VERSION/PROJECTS/SNAPSHOT), không mặc định thiếu login/quyền từ mọi lỗi subprocess. Snapshot/fingerprint vẫn bắt buộc; xem mục sửa CLI trong báo cáo.
+
+T06/T07 đã nghiệm thu theo [T06 status](../docs/reports/T06-STATUS-REPORT.md) và [T07 status](../docs/reports/T07-STATUS-REPORT.md): hiện có hai PUBLISHED posts được chủ dự án giữ lại; các mục T06-A/B.5 bên dưới là **snapshot lịch sử**, không phải trạng thái nghiệm thu hiện hành.
+
 ## T06-B.5 — Cloud smoke PASS, chưa chạy writes
 
 Chủ dự án đã triển khai migration/Edge/secret T06. Runner mới dùng hai OU accounts hiện có A/B, publishable key và cùng guard/env T03; không Admin API/raw tables hoặc tạo/xóa account. Lượt 16/11/2026 smoke đã PASS; read-only snapshot trước/sau users=2, profiles=2, roles=0, posts=0. Offline hiện **130/130 PASS**. Không coi feed rỗng là bằng chứng DTO/order/concurrency đã đạt.

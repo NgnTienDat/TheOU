@@ -1,10 +1,15 @@
 import { ApiError } from './response.ts'
 import { type PostRequest, validatePostRequest } from '../modules/posts/post-validation.ts'
+import { type CommentRequest, validateCommentRequest } from '../modules/comments/comment-validation.ts'
 
-export type SocialRequest = PostRequest | { action: 'getMe'; payload: Record<string, never> } | {
-  action: 'updateNickname'
-  payload: { nickname: string }
-}
+export type SocialRequest =
+  | PostRequest
+  | CommentRequest
+  | { action: 'getMe'; payload: Record<string, never> }
+  | {
+    action: 'updateNickname'
+    payload: { nickname: string }
+  }
 
 export function validateNickname(value: unknown): string {
   if (typeof value !== 'string' || /[\p{Cc}\p{Cf}]/u.test(value)) {
@@ -69,7 +74,10 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
   ) {
     return { action: 'updateNickname', payload: { nickname: validateNickname(body.payload.nickname) } }
   }
-  return validatePostRequest(body.action, body.payload)
+  return typeof body.action === 'string' &&
+      ['listComments', 'createComment', 'deleteComment'].includes(body.action)
+    ? validateCommentRequest(body.action, body.payload)
+    : validatePostRequest(body.action, body.payload)
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

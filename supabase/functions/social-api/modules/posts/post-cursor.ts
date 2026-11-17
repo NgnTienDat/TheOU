@@ -1,5 +1,7 @@
 import { ApiError } from '../../shared/response.ts'
 import { type ListPostsInput, timestampPattern, uuidPattern } from './post-validation.ts'
+import { signCursor, verifyCursor } from '../../shared/cursor.ts'
+export { assertCursorSecret } from '../../shared/cursor.ts'
 
 interface Cursor {
   v: 1
@@ -10,35 +12,8 @@ interface Cursor {
   id: string
   upvoteCount: number
 }
-function encode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function decode(value: string): Uint8Array<ArrayBuffer> {
-  if (!/^[\w-]+$/.test(value)) throw new Error('Invalid base64url')
-  const bytes = Uint8Array.from(
-    atob(value.replace(/-/g, '+').replace(/_/g, '/')),
-    (char) => char.charCodeAt(0),
-  )
-  if (encode(bytes) !== value) throw new Error('Noncanonical base64url')
-  return bytes
-}
-export function assertCursorSecret(secret: string) {
-  if (!/^[A-Za-z0-9_-]{43,128}$/.test(secret)) throw new ApiError('INTERNAL_ERROR')
-}
-async function signingKey(secret: string) {
-  assertCursorSecret(secret)
-  return await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  )
-}
 export async function encodeCursor(value: Omit<Cursor, 'v'>, secret: string) {
-  const data = new TextEncoder().encode(JSON.stringify({ v: 1, ...value }))
-  const signature = await crypto.subtle.sign('HMAC', await signingKey(secret), data)
-  return `${encode(data)}.${encode(new Uint8Array(signature))}`
+  return await signCursor({ v: 1, ...value }, secret)
 }
 export async function decodeCursor(
   value: string,
@@ -46,17 +21,9 @@ export async function decodeCursor(
   secret: string,
   now: number,
 ): Promise<Cursor> {
-  const key = await signingKey(secret)
+  const decoded = await verifyCursor(value, secret)
   try {
-    if (value.length > 1024) throw new Error('Length')
-    const parts = value.split('.')
-    if (parts.length !== 2) throw new Error('Shape')
-    const data = decode(parts[0])
-    const signature = decode(parts[1])
-    if (signature.length !== 32 || !await crypto.subtle.verify('HMAC', key, signature, data)) {
-      throw new Error('Signature')
-    }
-    const cursor = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data)) as Cursor
+    const cursor = decoded as Cursor
     if (
       !cursor || Object.keys(cursor).sort().join(',') !== 'asOf,id,publishedAt,sort,tag,upvoteCount,v' ||
       cursor.v !== 1 || cursor.sort !== input.sort || cursor.tag !== input.tag ||

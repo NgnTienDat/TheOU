@@ -9,6 +9,7 @@ import { ProfilePage } from '../features/profile/ProfilePage.tsx'
 import { AppFrame } from '../shared/components/AppFrame.tsx'
 import { FeedPage } from '../features/feed/FeedPage.tsx'
 import { CreatePostPage } from '../features/posts/CreatePostPage.tsx'
+import { PostDetailPage } from '../features/posts/PostDetailPage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,11 +30,12 @@ export function App() {
                 <Route path="/dang-ky" element={<CredentialsPage key="signup" signup />} />
                 <Route path="/xac-thuc" element={<VerificationPage />} />
               </Route>
-              <Route element={<SessionGate protectedRoute />}><Route path="/ca-nhan" element={<ProfilePage />} /></Route>
             </Route>
             <Route element={<AppFrame />}><Route element={<SessionGate protectedRoute />}>
+              <Route path="/ca-nhan" element={<ProfilePage />} />
               <Route path="/" element={<FeedPage />} />
               <Route path="/bai-viet/moi" element={<CreatePostPage />} />
+              <Route path="/bai-viet/:id" element={<PostDetailPage />} />
             </Route></Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
