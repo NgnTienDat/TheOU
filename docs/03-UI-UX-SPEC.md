@@ -2,10 +2,10 @@
 
 ## 1. Định hướng giao diện
 
-**UI baseline T05 đã duyệt:** [prototype và design conventions](fe-templates/README.md). React giữ appearance/components của HTML; kiểm tra dark/light ở 360/390/768/1280px. Bỏ preview/mock/OTP mẫu. T07-A chuyển login/OTP thành công về Feed `/` sau xác thực/getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. Feed/Composer local đang chờ chủ dự án review UI và kiểm thử Cloud.
+**Visual reference hiện tại:** Auth dùng prototype T05; các trang social dùng [TheOU Social UI V2 và conventions](fe-templates/README.md). **UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026)**; chủ dự án nghiệm thu visual6/6 và Cloud read-only regression6/6. Xem [báo cáo cuối](reports/UI-V2-STATUS-REPORT.md). T01–T08 giữ trạng thái nghiệm thu đã chốt. HTML quyết định appearance; bảo mật, API và nghiệp vụ vẫn theo tài liệu nguồn. Bỏ preview/mock/OTP mẫu. Login/OTP về `/` sau getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. T09 vẫn NOT STARTED.
 
 - **Ưu tiên tiếng Việt**, đơn giản, ngắn gọn, không dùng thuật ngữ kỹ thuật với sinh viên.
-- Mobile-first: một cột nội dung, tối đa rộng ~680 px cho feed trên desktop.
+- Mobile-first: social một cột tối đa640px, rail92px desktop (66px ở721–1100px), mobile≤720px có header/bottom nav. Auth giữ chiều rộng T05.
 - Phong cách trung tính, dễ đọc, tập trung vào văn bản; không sao chép giao diện thương hiệu của nền tảng khác.
 - Tránh dùng logo OU chính thức hoặc khiến người dùng hiểu nhầm sản phẩm thuộc trường.
 - Accessibility cơ bản: nhãn input, focus visible, tương phản, thông báo lỗi có văn bản, nút tối thiểu 44×44 px trên mobile.
@@ -95,7 +95,7 @@ flowchart TD
 - Khi chuyển tab/tag, về đầu feed và reset cursor; giữ vị trí cuộn nếu mở bài rồi quay lại là cải tiến P1.
 - Bài viết `ANONYMOUS` ghi `OUer ẩn danh`; `NICKNAME` ghi nickname snapshot.
 
-**T07-A hiện tại:** chỉ render PostPublic, giữ xuống dòng; authorLabel lấy từ API, không ghép profile/email. Số vote/comment chỉ đọc, không có link tác giả, menu sửa/xóa, media hoặc route chi tiết chưa triển khai. Skeleton 3 bài, empty/error/retry, tải thêm có loading/error; cursor lỗi yêu cầu làm mới. Tag cuộn ngang; refresh và đổi sort/tag bắt đầu từ cursor null, không hiển thị dữ liệu filter cũ. HOT giữ thứ tự server; dedupe không bảo đảm không bỏ sót khi vote thay đổi. Mở bài/bình luận/upvote tương tác thuộc các task sau.
+**Feed text:** chỉ render PostPublic, giữ xuống dòng; authorLabel lấy từ API, không ghép profile/email. Số vote/comment chỉ đọc. T08-A.1 dùng semantic stretched link phủ toàn PostCard tới `/bai-viet/:id`, có hover/focus và Enter, giữ Ctrl/Cmd/middle-click native. Text có thể chọn/copy, không điều hướng khi kéo chọn; contact link và button nằm trên lớp phủ, không lồng interactive elements. Không link tác giả; PostCard trong Detail không link về chính nó. Chưa có menu sửa/xóa bài hay media. Skeleton3, empty/error/retry, tải thêm có loading/error; cursor lỗi yêu cầu làm mới. Tag cuộn ngang; refresh và đổi sort/tag bắt đầu từ cursor null. HOT giữ thứ tự server; dedupe không bảo đảm không bỏ sót khi vote thay đổi. Upvote tương tác thuộc T09.
 
 ## 5. Luồng 3 — Viết bài
 
@@ -127,7 +127,14 @@ T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi
 - Form bình luận tối đa 500 ký tự, trạng thái gửi, lỗi gửi, nút thử lại.
 - Tác giả bài viết (OP) khi bình luận: `Chủ bài`, không kèm nickname nếu bài ẩn danh.
 - Người bình luận khác: `OUer ẩn danh`; có nút xóa cho bình luận của chính người dùng.
-- Upvote phản hồi nhanh có xử lý rollback khi API trả lỗi.
+- T08-A.1 giữ route protected `/bai-viet/:id`, dùng một container hội thoại liên tục: header Back icon + `Bài viết` → post → separator → inline composer → separator → comments/load more. Không chia thành các card nổi hoặc heading lớn cho form. Chỉ PUBLISHED; NOT_FOUND/parent vừa bị ẩn thì bỏ tương tác và không hiển thị comments cũ.
+- Comment list chỉ VISIBLE, ASC createdAt/id, page20, opaque cursor; tải thêm/dedupe/refresh. Query key tách postId và session scope. Loading/empty/error/retry; V2 chỉ dùng biểu tượng ẩn danh giống nhau, không avatar thật, profile link hoặc khóa nhận diện commenter.
+- Form trim1–500 Unicode code points, chặn NUL/lone surrogate, counter/focus/error. Tạo snapshot/key trước gửi; timeout retry cùng snapshot/key, giữ text và khóa field khi chưa rõ kết quả. Không persist nội dung/key; rời/reload hoặc Auth unmount chưa khôi phục draft comment.
+- Composer desktop là ô bo tròn với placeholder `Viết bình luận...`, rỗng chỉ có textarea. Khi có text, hiện nút arrow-up; chỉ enabled nếu hợp lệ, hoặc retry snapshot đã khóa. Textarea tự tăng tối đa160px/30% viewport rồi cuộn; Enter xuống dòng, Ctrl/Cmd+Enter gửi (không gửi khi IME composing). Loading khóa gửi trùng, lỗi giữ nội dung/key.
+- Mobile V2≤720px: composer fixed full-width phía trên bottom nav64px cộng safe-area, có background/border. ResizeObserver đo chiều cao thực để chừa đáy thread; khi VisualViewport thu nhỏ do bàn phím, tạm ẩn nav và đặt form trong viewport khả dụng. Một form giữ nguyên draft/retry state khi đổi breakpoint; không autofocus vào Detail. Kiểm tra360/390px; mô phỏng browser không thay thế bàn phím iOS/Android thật.
+- Icon stroke20px thống nhất cho Back/refresh/send/delete, chevron-down kèm text cho tải thêm; không thêm dependency. Icon button44×44px, aria-label tiếng Việt, title khi cần, focus ring và disabled/loading. Không thêm vote/comment profile link/avatar hay action giả.
+- Xóa chỉ trên comment của mình, có confirm, disabled/loading và lỗi an toàn. Timeout chưa được coi là xóa thành công; success thì reset list từ cursor null và refetch detail/feed counts từ server, không tự cộng/trừ count.
+- Upvote phản hồi nhanh/rollback là thiết kế T09, **chưa triển khai**.
 - Không có lồng phản hồi nhiều cấp trong MVP. Trả lời một người là một bình luận mới trong cùng bài.
 
 ## 7. Luồng 5 — Kiểm duyệt

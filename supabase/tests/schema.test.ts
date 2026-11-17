@@ -42,6 +42,7 @@ test('migration trên PostgreSQL tạm — không phải Supabase Cloud', async 
   await db.query(`insert into public.profiles (id, nickname) values ($1, 'Test-A'), ($2, 'Test-B')`, [a, b])
   await db.query(`insert into public.posts (id, author_id, tag, body, idempotency_key)
     values ($1, $2, 'CONFESSION', 'Nội dung giả để kiểm thử', $3)`, [post, a, key])
+  await db.query(`update public.posts set status='PUBLISHED' where id=$1`, [post])
   await db.query(`insert into public.comments (id, post_id, author_id, body, idempotency_key)
     values ($1, $2, $3, 'Bình luận thử', $4)`, [comment, post, a, randomUUID()])
 

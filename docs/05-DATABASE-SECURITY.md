@@ -19,6 +19,17 @@
 - List/get chỉ đọc PUBLISHED, DTO allowlist 12 field, isMine tính tại server và hasUpvoted đọc vote của chính caller. Cursor ký HMAC chỉ chứa sort/tag/tuple bài/mốc đọc; không author ID/email. Secret cursor chỉ ở Edge, không dùng lại JWT/service-role key. Không có định danh tác giả xuyên bài anonymous.
 - Đây là kết quả local/PGlite, **chưa push migration hoặc deploy T06**. Khóa tranh chấp PostgreSQL Cloud, PostgREST embed/count/cache, hiệu năng HOT và tests A/B thật còn phải xác minh ở T06-B. Count/rate limit chưa có cơ chế cập nhật mới trong T06-A; không coi API foundation là đã nghiệm thu chống spam hoặc Prototype.
 
+### T08-A — Comment lifecycle/count local, chưa deploy
+
+- Tái sử dụng comments T02: unique `(author_id,idempotency_key)`, FK/immutable identity/created_at, index `(post_id,created_at,id)`, grants/RLS giữ nguyên. Không thêm index trùng hoặc sửa migration T02/T03/T06.
+- Migration riêng `20261117024216_t08_atomic_comments.sql`: khóa writes comments rồi posts trong transaction; tính VISIBLE count cho mỗi parent và chỉ UPDATE count đang lệch. Hai post T07 được giữ: không sửa body/status/owner/published_at hoặc xóa post; count/updated_at chỉ thay nếu thật sự cần đồng bộ hoặc comment write hợp lệ.
+- AFTER INSERT/UPDATE status/DELETE tính delta VISIBLE, `UPDATE posts SET comment_count=comment_count+delta` cùng transaction. Tăng count chỉ khi parent PUBLISHED, serialize với UPDATE status trên parent; không còn SELECT-then-INSERT guard duy nhất ở Edge. Unique DO NOTHING không chạy AFTER INSERT nên retry không tăng count. Giảm dưới0 bị CHECK T02 chặn, rollback cả status/count, không dùng GREATEST để giấu drift.
+- AFTER đặt thứ tự write comment/unique rồi parent; không giữ parent lock trước unique conflict. Concurrent delete khác row chỉ tranh parent count, không scan/lock các comments khác. T11 nếu thêm transaction nhiều parent/child phải review lại thứ tự khóa; PGlite không chứng minh deadlock/concurrency Cloud.
+- VISIBLE→HIDDEN/DELETED giảm1; HIDDEN→DELETED không giảm; HIDDEN→VISIBLE yêu cầu parent PUBLISHED và tăng1. DELETED không quay lại trạng thái khác. Physical DELETE VISIBLE có giảm count để hỗ trợ cleanup có review, không mở endpoint physical delete.
+- Helpers mới SECURITY INVOKER/search_path rỗng; revoke PUBLIC/anon/authenticated/service_role/supabase_auth_admin rồi chỉ grant EXECUTE service_role. Không public RPC/permission bypass. JWT/OU/confirmed/ACTIVE và owner vẫn do Edge guard/query kiểm soát.
+- Create dùng DO NOTHING rồi đọc theo author/key/so postId+body; mismatch hoặc hàng HIDDEN/DELETED trả CONFLICT, không lộ hoặc phục hồi body. Delete chỉ UPDATE id/author/VISIBLE; own DELETED replay success, HIDDEN/missing/cross-owner NOT_FOUND. Parent không hiển thị thì NOT_FOUND kể cả ADMIN.
+- CommentPublic chỉ id/postId/body/authorLabel/isOriginalPoster/isMine/createdAt; OP=Chủ bài, người khác=OUer ẩn danh. Cursor không có author IDs/email/status. Không triển khai admin hide/audit ở T08; T11 tái sử dụng lifecycle này, không nhân đôi deleteComment.
+
 ### Quyết định triển khai T02
 
 - Dùng UUID, `timestamptz`, `text + CHECK` cho trạng thái/tag; 9 bảng đúng đặc tả, kể cả cấu trúc `reports` để chuẩn bị W3. Chưa có API report, bucket Storage, trigger tạo profile Auth hoặc logic kiểm duyệt/rate limit.

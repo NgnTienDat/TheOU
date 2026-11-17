@@ -50,7 +50,7 @@ flowchart TD
 
 Đây là một **backend nhẹ**, không phải lựa chọn “không backend”. Sau này NestJS sẽ thay chính lớp này.
 
-## 4. Tổ chức mã nguồn T01–T07-A
+## 4. Tổ chức mã nguồn T01–T08-A
 
 ```text
 TheOU/
@@ -101,7 +101,7 @@ TheOU/
 └── README.md
 ```
 
-Các thư mục feature chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Test frontend đặt trong `frontend/tests/`, test DB/Auth/API đặt trong `supabase/tests/`. T04/T05 đã nghiệm thu getMe/updateNickname trên Cloud. T06 đã nghiệm thu `modules/posts/` gồm service bốn action, validation, mapper và cursor; chưa có action comment/vote/media. T07-A thêm frontend `feed/` và Composer trong `posts/`, chỉ local. `index.ts` khởi động Deno, `handler.ts` dispatch và tái sử dụng shared guard/errors/client/CORS.
+Các thư mục feature chưa dùng được giữ bằng `.gitkeep`, không phải tính năng đã triển khai. Tests frontend ở `frontend/tests/`, DB/Auth/API ở `supabase/tests/`. T04–T07 đã nghiệm thu getMe/updateNickname, Post API và Feed/Composer. T08-A thêm `modules/comments/` và frontend detail/comments local; chưa có vote mutation/media/moderation. `index.ts` khởi động Deno, `handler.ts` dispatch và tái sử dụng shared guard/errors/client/CORS.
 
 **Quyết định T04-A:** gateway giữ `verify_jwt = true`; handler gọi `auth.getUser(token)` bằng publishable client để xác minh với Auth server. Chỉ sau khi email chính xác domain OU và đã xác minh mới khởi tạo client đặc quyền, đọc profile bằng ID từ Auth, chặn BANNED rồi đọc ADMIN từ `user_roles`. Các lượt đọc profile/role này là một phần authorization bắt buộc vì T02 khóa raw tables đối với user client. Client đặc quyền không nhận session/Authorization từ request.
 
@@ -113,7 +113,7 @@ T01 dùng Tailwind qua plugin Vite, React Router chế độ declarative, TanSta
 
 **T05 COMPLETED:** UI theo [baseline](fe-templates/README.md). Feature Auth chứa service, session controller/provider và bốn trang; shared API adapter validate envelope/DTO. SDK tự quản lý session, listener chỉ chuyển state đồng bộ rồi tải getMe ngoài callback; không lưu token riêng. Cache xóa khi đổi user/logout/401/403; protected route chờ Auth và getMe. SessionStorage chỉ giữ email/thời điểm chờ xác minh, localStorage chỉ thêm theme preference. `updateNickname` và bốn action post T06 đã deploy.
 
-**T07-A local:** AppFrame dùng chung header/theme/disclaimer cho Auth, Feed và Composer; `/` và `/bai-viet/moi` đều qua SessionGate. `useFeed` gọi `useInfiniteQuery`, key `['posts', scope, sort, tag]` với scope là generation phiên, không dùng email/UUID/JWT làm key feed. Cursor opaque từ API, limit=20; đổi filter bỏ cache mục tiêu, refresh reset về trang đầu; dedupe id giữ thứ tự server, không tính lại HOT. Callback chỉ reject Auth nếu còn đúng scope, response muộn bị cô lập/hủy kết quả. Logout/account change hủy và xóa cache.
+**T07 đã nghiệm thu:** AppFrame dùng chung header/theme/disclaimer cho Auth, Feed và Composer; `/` và `/bai-viet/moi` đều qua SessionGate. `useFeed` gọi `useInfiniteQuery`, key `['posts', scope, sort, tag]` với scope là generation phiên, không dùng email/UUID/JWT làm key feed. Cursor opaque từ API, limit=20; đổi filter bỏ cache mục tiêu, refresh reset về trang đầu; dedupe id giữ thứ tự server, không tính lại HOT. Callback chỉ reject Auth nếu còn đúng scope, response muộn bị cô lập/hủy kết quả. Logout/account change hủy và xóa cache.
 
 Adapter của phiên ready giữ Authorization đã chụp trong closure bộ nhớ, tránh SDK lấy nhầm JWT tài khoản khác cho request trễ; timeout 15 giây không đồng nghĩa server rollback. `createPostSubmission` khóa snapshot canonical và UUID trước await; tạo draft ACK mới publish, retry có postId chỉ publish. React dùng external store để phản ánh trạng thái; không component nào gọi SDK trực tiếp. Sau publish, invalidate/bỏ feed cache của scope, về `/` mặc định NEW. Không persist draft/UUID/postId hoặc thêm token vào storage; reload/rời Composer/Auth revalidation có thể mất trạng thái, chưa có recovery qua server. Xem [bàn giao T07-A](reports/T07-A-IMPLEMENTATION.md).
 
@@ -122,6 +122,12 @@ Adapter của phiên ready giữ Authorization đã chụp trong closure bộ nh
 - Các interface TypeScript và response model theo `06-API-CONTRACT.md`, không lộ kiểu dữ liệu Supabase vào UI.
 - Supabase Auth SDK chỉ ở module `auth`, **không** gọi bảng nghiệp vụ bằng `.from(...)` ở frontend.
 - Optimistic update chỉ dành cho upvote; tạo bài phải dựa vào phản hồi server.
+
+**T08-A local, chưa deploy:** `modules/comments/` triển khai list/create/delete qua guard/envelope hiện có. `shared/cursor.ts` tách HMAC/base64url để post/comment dùng cùng THEOU_POST_CURSOR_SECRET; post giữ nguyên định dạng v1, comment thêm kind=comments và postId, TTL15phút. Timestamp microseconds giữ nguyên khi làm tuple `(created_at,id)` ASC. Mapper chỉ xuất bảy field CommentPublic, OP so sánh hai author IDs ở server rồi chỉ trả nhãn Chủ bài/boolean; không nickname hoặc commenter identifier xuyên bài.
+
+Migration `20261117024216_t08_atomic_comments.sql` dùng AFTER row trigger cập nhật count bằng delta cùng transaction; parent phải PUBLISHED khi tăng. Không giữ parent lock trước kiểm tra unique conflict của INSERT, không RPC public. Trạng thái DELETED không được phục hồi. Backfill count từ VISIBLE chỉ sửa hàng lệch khi đã khóa writes comments/posts; không reset tùy tiện.
+
+Frontend thêm PostDetailPage và `features/comments/`: query theo scope/postId, client runtime DTO allowlist, snapshot/key retry comment trong bộ nhớ, xóa có điều kiện/confirm và refetch counts từ server. PostCard trên Feed chỉ link phần nội dung tới detail, contact giữ link riêng. Response muộn bỏ theo AbortSignal/scope/mount; parent NOT_FOUND chặn tương tác. Không thay Auth/T07 create→publish hoặc thêm vote/media/admin. Chi tiết và giới hạn Cloud locking ở [bàn giao T08-A](reports/T08-A-IMPLEMENTATION.md).
 
 ## 6. Luồng xác thực
 

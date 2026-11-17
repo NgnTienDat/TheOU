@@ -57,8 +57,9 @@ export interface CreateCommentInput {
   body: string
   idempotencyKey: string
 }
+export interface ListCommentsInput { postId: string; cursor: string | null; limit: number }
 
-// Adapter hiện có getMe/updateNickname và bốn action post; comment/vote là contract task sau.
+// Adapter triển khai profile/post/comment; vote mutation thuộc T09.
 export interface SocialApiClient {
   getMe(): Promise<Me>
   updateNickname(nickname: string): Promise<{ nickname: string }>
@@ -66,8 +67,9 @@ export interface SocialApiClient {
   getPost(postId: string): Promise<PostPublic>
   createPost(input: CreatePostInput): Promise<{ postId: string; status: 'DRAFT' }>
   publishPost(postId: string): Promise<PostPublic>
-  listComments(postId: string, cursor?: string): Promise<Page<CommentPublic>>
+  listComments(input: ListCommentsInput): Promise<Page<CommentPublic>>
   createComment(input: CreateCommentInput): Promise<CommentPublic>
+  deleteComment(commentId: string): Promise<{ success: true }>
   setUpvote(postId: string, desiredState: boolean): Promise<{ hasUpvoted: boolean; upvoteCount: number }>
 }
 

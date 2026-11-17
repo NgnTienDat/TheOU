@@ -13,6 +13,7 @@
     "test:cloud": "node --env-file=.env.test.local --test tests/cloud.integration.ts",
     "test:t04-cloud": "node --env-file=.env.test.local scripts/t04-cloud.ts",
     "test:t06-cloud": "node --env-file=.env.auth.local scripts/t06-cloud.ts",
+    "test:t08-cloud": "node --env-file=.env.auth.local scripts/t08-cloud.ts",
     "auth:manual": "node --env-file=.env.auth.local scripts/auth-manual.ts"
   },
   "devDependencies": {

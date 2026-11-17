@@ -13,7 +13,7 @@ export function ProfilePage() {
   const me = state.me
   if (!me) return null
   const validation = nicknameError(nickname)
-  return <div className="screen active">
+  return <><header className="page-header"><h1>Cá nhân</h1></header><section className="card profile-panel" aria-label="Thông tin cá nhân">
     <Alert message={task.error} />
     <div className="profile-top">
       <div className="avatar" aria-hidden="true">OU</div>
@@ -37,5 +37,5 @@ export function ProfilePage() {
     </form>}
     <div className="divider" />
     <button type="button" className="logout" disabled={task.busy} onClick={() => void task.run(async () => { setPending(null); await controller.logout(); notify('Đã đăng xuất.') })}>Đăng xuất</button>
-  </div>
+  </section></>
 }

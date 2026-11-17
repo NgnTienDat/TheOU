@@ -23,9 +23,21 @@
 | T04 | Xây `social-api` auth guard, error wrapper, `getMe` | T02,T03 | **COMPLETED — PASS 16/11/2026:** T04-A typecheck, Deno check/lint/fmt và 65/65 offline PASS; sau B.7, 99/99 offline PASS. Chủ dự án xác nhận smoke Cloud và BANNED/ADMIN/RACE PASS, cleanup users=1, profiles=1, roles=0 khớp baseline. Xem [báo cáo nghiệm thu T04](reports/T04-STATUS-REPORT.md) |
 | T05 | UI đăng ký/mật khẩu, OTP xác minh signup, đăng nhập mật khẩu, route guard, nickname | T03,T04 | **COMPLETED — PASS 16/11/2026:** frontend 23/23, Supabase 102/102 offline PASS; lint/typecheck/build/Deno và browser UI đạt, React UI được chủ dự án phê duyệt. Chủ dự án xác nhận Cloud login/session/getMe/updateNickname/logout và signup + OTP regression PASS; updateNickname đã deploy. OU alias +t05 được giữ lại, chính sách alias theo issue riêng trước Beta. Xem [nghiệm thu T05](reports/T05-STATUS-REPORT.md) |
 | T06 | `createPost` draft, `publishPost`, `listPosts`, `getPost` text | T04 | **COMPLETED — PASS (16/11/2026):** T06-A Supabase 116/116, frontend 25/25 offline PASS; sau runner 130/130 PASS. Migration/Edge đã deploy, smoke A/B đạt; chủ dự án xác nhận controlled writes/API, PostgreSQL 5 post (4 PUBLISHED/1 DRAFT), race 1 row, 10 negative không tạo row, anonymous violations=0. Cleanup PASS, 15/15 keys row_count=0; baseline users=2/profiles=2/roles=0/posts=0/test_posts_remaining=0. HOT snapshot/biên vote–24h–ties, đổi nickname sau publish, cursor hết hạn, chống spam/performance còn giới hạn theo [nghiệm thu T06](reports/T06-STATUS-REPORT.md). Sẵn sàng T07, chưa triển khai UI |
-| T07 | Feed mobile-first, tab mới/nổi bật, tag, composer text | T06 | **T07-A local completed / pending UI review — 17/11/2026:** frontend 43/43 offline PASS; lint/typecheck/build đạt (còn cảnh báo bundle >500 kB); browser offline Auth 32 và Feed/Composer 22 ảnh ở 360/390/768/1280px dark/light đạt. T07-B A/B Cloud E2E và kiểm kê/cleanup chưa chạy; **chưa COMPLETED toàn T07**. Xem [bàn giao T07-A](reports/T07-A-IMPLEMENTATION.md) |
+| T07 | Feed mobile-first, tab mới/nổi bật, tag, composer text | T06 | **COMPLETED — PASS (17/11/2026):** frontend 43/43 offline PASS; lint/typecheck/build/diff đạt, browser offline 54 ảnh; chủ dự án duyệt 6/6 UI checklist và xác nhận A/B React Cloud E2E PASS. PostgreSQL: 2 posts, 2 PUBLISHED, 0 DRAFT, 2 publishing_accounts, anonymous_violations=0. **Chủ dự án giữ cả hai bài, không cần cleanup.** Còn giới hạn recovery/HOT/accessibility/bundle/chống spam/alias theo [nghiệm thu T07](reports/T07-STATUS-REPORT.md). Sẵn sàng T08; chưa nghiệm thu W2/Prototype |
 
 **Gate W1:** 2 email OU có thể đăng nhập, A đăng text ẩn danh, B đọc feed; thử request trực tiếp không có JWT và direct DB access bị chặn. Chỉ chuyển W2 sau khi chứng minh dữ liệu identity không rò rỉ qua DTO.
+
+**Đánh giá Gate W1 — 17/11/2026: ĐẠT trong phạm vi luồng text theo bằng chứng tích lũy.** Không chạy lại các ca bảo mật trong lượt đóng tài liệu:
+
+| Tiêu chí W1 | Kết quả và nguồn bằng chứng |
+|---|---|
+| Hai email OU đăng nhập | **ĐẠT:** chủ dự án xác nhận hai tài khoản đăng nhập/đăng bài qua React UI T07-B; hai danh tính Auth không chứng minh hai sinh viên độc lập |
+| A đăng text ẩn danh, B đọc feed | **ĐẠT trong các lớp đã kiểm thử:** T06 controlled writes xác nhận bài ẩn danh và B đọc qua API; T07-B xác nhận hai tài khoản đăng bài và bài xuất hiện trên Feed React. Không suy ra cả hai bài giữ lại đều ẩn danh chỉ từ anonymous_violations=0 |
+| Request trực tiếp không JWT bị chặn | **ĐẠT:** Cloud smoke T04/T06 đã PASS, T06 ghi handler UNAUTHENTICATED/401; không nhận là ca mới chạy ở T07-C |
+| Direct raw-table access bị chặn | **ĐẠT:** Cloud integration và catalog/grants/RLS T02 đã nghiệm thu; T07 không mở lại quyền bảng, không kiểm tra Cloud mới trong lượt này |
+| Identity không rò qua DTO bài text | **ĐẠT trong ca đã chạy:** T06 Cloud PostPublic allowlist/privacy A/B, T07-A automated adapter/DOM và số liệu DB T07-B anonymous_violations=0. Số đếm DB riêng lẻ không chứng minh toàn bộ response an toàn |
+
+Chi tiết nguồn/giới hạn ở [báo cáo T07](reports/T07-STATUS-REPORT.md). **W2 và E2E-001 bên dưới chưa được nghiệm thu**; không đánh dấu các bước ảnh/comment/upvote/delete/moderation hoặc mở Beta. Rate limiting/chống spam chưa nghiệm thu; [AUTH-ALIAS-001](issues/AUTH-ALIAS-001.md) vẫn mở trước Beta. Hai bài T07 là dữ liệu chủ dự án chủ động giữ trên TheOU-dev, không phải fixture còn sót cần xóa; số posts=0 của T06 chỉ là baseline lịch sử.
 
 **T04-B.7 (16/11/2026):** chủ dự án xác nhận đã chạy runner trên TheOU-dev: BANNED bị chặn với JWT cũ, ADMIN thay đổi theo DB với cùng JWT, 10 yêu cầu khởi tạo profile đồng thời đạt, cleanup về baseline. Cờ `THEOU_ALLOW_T04_CLOUD_TESTS` đã được chủ dự án đặt lại rỗng. Đây là bằng chứng nghiệm thu T04; [hướng dẫn B.7](reports/T04-B7-SECURITY-TEST.md) ghi trạng thái trước khi chạy, còn [báo cáo T04](reports/T04-STATUS-REPORT.md) ghi kết quả cuối. Giới hạn: logout local không chứng minh JWT cũ bị thu hồi ngay; 10 yêu cầu không phải kiểm thử chịu tải.
 
@@ -45,14 +57,27 @@ Xem [báo cáo nghiệm thu T03](reports/T03-STATUS-REPORT.md); [T03-A Implement
 
 | ID | Công việc | Phụ thuộc | Tiêu chí xong |
 |---|---|---|---|
-| T08 | `listComments`, `createComment`, `deleteComment`; UI comment | T06 | B bình luận, A phản hồi với nhãn Chủ bài |
-| T09 | `toggleUpvote` atomic, optimistic UI + rollback | T06 | Click trùng không tạo nhiều vote |
+| T08 | `listComments`, `createComment`, `deleteComment` chính chủ; chi tiết bài/UI comment | T06,T07 | **COMPLETED — PASS (17/11/2026):** UI A.1 được chủ dự án phê duyệt; frontend54/54, Supabase179/179 offline PASS. Migration/trigger/ACL/RLS/social-api/manual A/B6/6 và smoke đạt; controlled create/idempotency/lost ACK simulation, R1 pagination/privacy/cursor thật khác post, R2 cross-owner/concurrent delete/replay/atomic count PASS. Journal R2 local COMPLETED/uncertain=false; chủ dự án xác nhận cleanup sáu fixture và SQL verification PASS. Cuối: users2/profiles2/posts2 PUBLISHED/comments2 (VISIBLE1/DELETED1), counts1/0, mismatch0, fixture0; **giữ hai bài T07/hai comment thủ công T08**. Còn giới hạn recovery reload/cursor expiry/ties/parent race/abuse/load/mobile thực/bundle và AUTH-ALIAS-001. Social UI V2 là thiết kế riêng chưa tích hợp React; không tính hoàn thành V2 hoặc W2/Prototype. Xem [nghiệm thu T08](reports/T08-STATUS-REPORT.md). |
+| T09 | `toggleUpvote` atomic, optimistic UI + rollback | T06 | **READY / NOT STARTED.** UI-V2 đã nghiệm thu; chờ task T09 riêng. Tiêu chí: click trùng không tạo nhiều vote |
 | T10 | Tải ảnh private, signed upload/finalize/read, xóa metadata | T06 | Đăng và xem được tối đa 2 ảnh |
-| T11 | Xóa mềm bài, xóa mềm comment, admin hide/audit tối thiểu | T08 | Admin ẩn nội dung, người thường không làm được |
+| T11 | Xóa mềm bài, admin hide/audit; tái sử dụng comment lifecycle/delete của T08 | T08 | Admin ẩn nội dung, người thường không làm được; không nhân đôi deleteComment |
 | T12 | Test E2E, test quyền truy cập, responsive + sửa lỗi | T08–T11 | Gate Prototype đủ 7 bước và test bảo mật |
 | T13 | Deploy staging và hướng dẫn chạy/rollback | T12 | Link HTTPS được bảo vệ, test 2 tài khoản OU |
 
 **Gate W2 — Prototype:** xem checklist ở mục 3. Chỉ mời nhóm test nhỏ, có admin trực để xử lý vấn đề.
+
+### UI-V2 — Post-T08 / Pre-T09 — COMPLETED / PASS (17/11/2026)
+
+Task giao diện riêng, hỗ trợ US-03/US-04/US-05/US-07 và giữ Auth/Profile US-01/US-02. T01–T08 giữ nguyên nghiệm thu; ghi chú V2 chưa tích hợp ở snapshot T08 là trạng thái trước task này. HTML V2 là approved visual reference, không thay API/behavior contract hoặc tự hoàn tất W2/Prototype.
+
+| Giai đoạn | Trạng thái và bằng chứng |
+|---|---|
+| UI-V2-A React integration | **PASS.** Feed/PostCard/Detail/Comments/Compose và shell Cá nhân chuyển V2; Auth T05 giữ appearance, business/API/DTO không đổi. Frontend54/54 tests, lint/typecheck/build và ba browser scripts PASS;76 ảnh React +24 ảnh HTML reference tại360/390/768/1280px dark/light. Theo [báo cáo A](reports/UI-V2-A-IMPLEMENTATION.md), không chạy lại trong lượt chốt. |
+| UI-V2-B.1 Manual visual review | **6/6 PASS — chủ dự án xác nhận:** Feed desktop/mobile, PostCard/tương tác, Detail/Comments, responsive composer, Create Post/Profile/Auth/theme. |
+| UI-V2-B.2 Cloud read-only regression | **6/6 PASS — chủ dự án xác nhận trên TheOU-dev:** A/B sử dụng React V2, đọc Feed/Detail, privacy/ownership/session isolation, navigation/theme; không phát hiện regression trong checklist. Không phải agent chạy lại Cloud E2E; không có SQL baseline trước/sau mới trong lượt chốt. |
+| UI-V2-C Documentation closure | **COMPLETED — PASS (17/11/2026).** Báo cáo cuối/conventions/kế hoạch đồng bộ, diff check đạt; không sửa source hoặc truy cập Cloud. Xem [nghiệm thu UI-V2](reports/UI-V2-STATUS-REPORT.md). |
+
+Giới hạn: browser automated dùng API giả, Cloud regression B.2 là manual chỉ đọc; chưa nghiệm thu lại Cloud writes hoặc đầy đủ bàn phím iOS/Android/safe-area/screen reader thật. Recovery sau reload/rời Composer, HOT không snapshot, bundle JS569.25kB (>500kB), rate limiting/chống spam/performance và AUTH-ALIAS-001 còn mở. T09 upvote/T10 media chưa triển khai; không vote/repost/comment reaction giả. **UI-V2 COMPLETED — PASS; T09 READY / NOT STARTED.** Không suy ra toàn W2/Prototype đã hoàn thành hoặc tự thay đổi hai posts/hai comments được giữ lại.
 
 ### W3 — Moderation + abuse prevention
 

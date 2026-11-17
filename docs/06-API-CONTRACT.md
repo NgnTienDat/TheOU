@@ -127,9 +127,9 @@ POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field th�
 
 Data đúng ba trường `{ "nickname": "OUer-1234", "emailMasked": "***@ou.edu.vn", "isAdmin": false }`, không trả UUID/email đầy đủ/metadata. EmailMasked chỉ thuộc chính chủ; che toàn bộ local part để không lộ MSSV. Profile thiếu được insert an toàn, giữ hàng thắng khi concurrent/retry; profile đã tồn tại không bị thay đổi. Role ADMIN chỉ đọc từ DB.
 
-OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả 401 theo định dạng nền tảng trước khi handler chạy; adapter frontend xử lý lỗi gateway riêng. T06-A bổ sung local bốn action post dưới đây; các action comment/vote/media/moderation/delete vẫn là thiết kế.
+OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả401 trước handler; adapter chuẩn hóa lỗi gateway. T06 đã nghiệm thu bốn action post; T08-A thêm local ba action comment. Vote/media/deletePost/moderation vẫn là thiết kế.
 
-### T06-A — bốn action post text (local, chờ review)
+### T06 — bốn action post text đã nghiệm thu
 
 - `createPost`: body trim, 1–1.000 Unicode code points, không NUL/lone surrogate; đúng năm tag và hai mode đã khai báo. Không nhận field identity/status/count/timestamp. UUID idempotency key được chuẩn hóa lowercase. `contactUrl` vắng/null cùng nghĩa; URL khác null chỉ cho NICKNAME + TAI_LIEU/TIM_TRO, tối đa 2.048 ký tự, không whitespace/control, HTTPS, không credentials/port khác mặc định, đúng hostname `zalo.me`, `facebook.com`, `www.facebook.com`, `m.facebook.com`, `m.me`. URL parser chuẩn hóa trước khi lưu/so sánh; URL ngoài chính sách bị từ chối, không tự bỏ qua.
 - Cùng author/key và cùng payload đã chuẩn hóa trả cùng `{postId,status:'DRAFT'}` ACK; payload khác trả CONFLICT/409, không sửa hàng cũ. ACK vẫn giữ nguyên khi retry sau publish, **không mô tả trạng thái hiện tại hoặc đưa bài trở về DRAFT**. DRAFT không có API đọc công khai.
@@ -142,6 +142,14 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
 - Query nghiệp vụ post dùng chung deadline 10 giây sau guard và signal hủy request; lỗi trả INTERNAL_ERROR/500. Timeout không bảo đảm DB chưa commit: retry create bằng cùng key/payload, publish bằng cùng postId. Deadline này không phải timeout toàn bộ pipeline Auth/đọc request.
 
 ## 4. Các thao tác cần atomic và idempotent
+
+### T08-A — Comment actions local, chờ review/deploy
+
+- `listComments({postId,cursor,limit})`: postId UUID, cursor null hoặc chuỗi1–1024, limit nguyên1–20; parent chỉ PUBLISHED, missing/private NOT_FOUND, không ADMIN bypass. Chỉ VISIBLE, `(created_at ASC,id ASC)`, giữ microseconds. Cursor HMAC dùng secret T06, thêm kind=comments/postId/asOf/createdAt/id/v1; max1024, hạn15phút, khác postId/loại cursor/tamper/expiry trả VALIDATION_ERROR. Không author/status trong cursor. Mốc trên không phải snapshot: hidden/deleted xảy ra giữa các trang vẫn ảnh hưởng kết quả, refresh lấy comments mới.
+- `createComment({postId,body,idempotencyKey})`: đúng ba field, body trim1–500 Unicode code points, không NUL/lone surrogate, UUID lowercase. Không nhận owner/status/timestamp/role. Lấy author từ guard; INSERT unique DO NOTHING rồi so payload. Cùng key/postId/body trả cùng CommentPublic nếu còn VISIBLE và parent PUBLISHED; mismatch hoặc comment HIDDEN/DELETED trả CONFLICT, không phục hồi nội dung. AFTER INSERT kiểm tra parent PUBLISHED và tăng count trong cùng transaction; lỗi/rollback không tạo count riêng lẻ.
+- `deleteComment({commentId})`: chỉ UUID; đọc/filter owner từ guard và parent PUBLISHED; UPDATE id/author/status=VISIBLE thành DELETED. Own DELETED trả `{success:true}` khi parent còn được xem; missing/cross-owner/HIDDEN cùng NOT_FOUND. Concurrent hide thắng thì không ghi đè; retry/lost response không trừ count lần nữa. Không physical DELETE/admin action.
+- Response create/list chỉ đúng bảy field CommentPublic. `authorLabel='Chủ bài'` khi OP, còn lại `'OUer ẩn danh'`, không nickname/authorId/email/MSSV/userMetadata/idempotencyKey/status. `isMine` theo caller; không commenter identifier xuyên bài. Quyền bảng/RLS không thay đổi.
+- Frontend T08-A thêm detail và comments; write success làm mới comment list từ cursor null, post detail và feed counts. Timeout giữ snapshot/key, không persist nội dung/JWT/key; reload/unmount recovery chưa hoàn chỉnh. Các ca Cloud còn chờ T08-B.
 
 - `createPost`: client giữ `idempotencyKey` UUID cho một lần submit; INSERT ON CONFLICT DO NOTHING rồi đọc theo author/key và so payload chuẩn hóa, không SELECT trước INSERT hoặc merge nội dung. Retry cùng payload trả ACK gốc, payload khác CONFLICT.
 - `publishPost`: gọi lại trên bài đã publish của cùng tác giả thì trả bản hiện tại; bài bị ẩn/xóa phải xử lý `CONFLICT`.
@@ -195,7 +203,7 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
 
 ## 7. API Adapter phía frontend
 
-`frontend/src/shared/api/SocialApiClient.ts` giữ interface/input/DTO. Factory `createSocialApi` trong `social-api.ts` đã có getMe/updateNickname và bốn action post T06 local; dùng functions.invoke, kiểm tra response runtime theo allowlist, chuẩn hóa lỗi gồm NOT_FOUND/CONFLICT. Không đọc bảng trực tiếp; chưa tạo Feed/Composer UI. Comment/vote/media trong interface chưa có adapter thực thi.
+`frontend/src/shared/api/SocialApiClient.ts` giữ interface/input/DTO. Factory `createSocialApi` dùng functions.invoke/runtime allowlist/lỗi an toàn. Post API T06 và Feed/Composer T07 đã nghiệm thu; T08-A thêm local adapter đủ list/create/deleteComment và detail UI. Không raw-table access. Vote/media chưa có adapter thực thi.
 
 ```ts
 interface SocialApiClient {
@@ -203,8 +211,9 @@ interface SocialApiClient {
   getPost(postId: string): Promise<PostPublic>;
   createPost(input: CreatePostInput): Promise<{ postId: string; status: 'DRAFT' }>;
   publishPost(postId: string): Promise<PostPublic>;
-  listComments(postId: string, cursor?: string): Promise<Page<CommentPublic>>;
+  listComments(input: {postId: string; cursor: string | null; limit: number}): Promise<Page<CommentPublic>>;
   createComment(input: CreateCommentInput): Promise<CommentPublic>;
+  deleteComment(commentId: string): Promise<{success: true}>;
   setUpvote(postId: string, desiredState: boolean): Promise<{ hasUpvoted: boolean; upvoteCount: number }>;
 }
 ```
@@ -213,7 +222,7 @@ Các phương thức còn lại tuân theo cùng mẫu. `createSocialApi` ánh x
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
-T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04/T05 đã nghiệm thu getMe/guard/updateNickname trên Cloud; T06-A mới kiểm thử offline bốn action post. T06-B phải kiểm chứng A tạo/publish, B đọc với isMine=false và không publish draft của A; nhiều bài anonymous không lộ khóa nối tác giả. Delete/OP thuộc T08/T11. Test CRUD service-role hoặc PGlite không thay thế JWT/PostgREST/transaction Cloud thật. Lỗi SQL/constraint phải map sang message an toàn ở Edge/adapter.
+T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04–T07 đã nghiệm thu trong phạm vi tương ứng. T08-A chỉ local comments/OP/soft-delete chính chủ; T11 phụ trách deletePost và admin hide/audit, tái sử dụng lifecycle comments. Test CRUD service-role hoặc PGlite không thay thế JWT/PostgREST/locking Cloud thật. Lỗi SQL/constraint phải map sang message an toàn ở Edge/adapter.
 
 Pseudocode chung:
 

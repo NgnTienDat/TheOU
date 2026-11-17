@@ -17,7 +17,11 @@
 
 **T06 — COMPLETED — PASS 16/11/2026:** migration/Edge, smoke A/B, controlled writes, DB verification và cleanup đã nghiệm thu; baseline cuối users=2/profiles=2/roles=0/posts=0. Xem [nghiệm thu T06](docs/reports/T06-STATUS-REPORT.md).
 
-**T07-A — local completed / pending UI review (17/11/2026):** Feed `/`, Composer text `/bai-viet/moi`, cache theo phiên và retry create/publish dùng cùng key/payload/postId. Chỉ kiểm thử offline với API giả; chưa kiểm thử E2E Cloud hoặc đánh dấu T07 COMPLETED. Xem [bàn giao T07-A](docs/reports/T07-A-IMPLEMENTATION.md).
+**T07 — COMPLETED — PASS 17/11/2026:** Feed/Composer đã được chủ dự án duyệt6/6 UI checklist, A/B Cloud E2E đạt. Hai bài PUBLISHED được giữ lại theo quyết định chủ dự án, không cleanup. Xem [nghiệm thu T07](docs/reports/T07-STATUS-REPORT.md).
+
+**T08 — COMPLETED — PASS (17/11/2026):** Comments API/UI được chủ dự án phê duyệt; frontend54/54, Supabase179/179 offline PASS. Cloud smoke/create/R1 và R2 delete/count đã đạt; chủ dự án xác nhận cleanup sáu fixture, cuối còn hai posts PUBLISHED/hai comments (VISIBLE1/DELETED1), counts1/0, mismatch0. **Giữ hai bài T07 và hai comment thủ công T08**, không cần cleanup thêm. Social UI V2 là thiết kế riêng chưa tích hợp React; không tính hoàn thành V2 hoặc toàn Prototype. Xem [nghiệm thu T08](docs/reports/T08-STATUS-REPORT.md) và [bằng chứng Cloud](docs/reports/T08-B-CLOUD-TESTS.md).
+
+**UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026).** Frontend54/54 và ba browser scripts offline PASS tại A; chủ dự án xác nhận visual6/6 và Cloud read-only regression6/6 PASS tại B. Ghi chú V2 chưa tích hợp trong snapshot nghiệm thu T08 phía trên là trạng thái trước task này. Xem [nghiệm thu UI-V2](docs/reports/UI-V2-STATUS-REPORT.md). **T09 — READY / NOT STARTED**; không suy ra W2/Prototype đã hoàn thành.
 
 ```text
 TheOU/
@@ -85,3 +89,9 @@ Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/se
 - Private Storage: https://supabase.com/docs/guides/storage/buckets/fundamentals
 
 > **Lưu ý vận hành:** Các nguồn của trường có thể thay đổi theo khóa học; kiểm chứng việc nhận OTP ở tài khoản OU đang hoạt động trước khi mở đăng ký.
+
+
+## Bổ sung, tập trung vào giá trị cốt lõi của TheOU
+TheOU tập trung vào hai giá trị:
+- Tính cộng đồng: Đọc những câu chuyện, tình cảm, sự kiện, share meme và vấn đề mà chỉ sinh viên OU mới thấy gần gũi.
+- Tính hữu ích: Tìm lại bài về môn học, tài liệu, kinh nghiệm, câu hỏi đã được giải đáp một cách dễ dàng.

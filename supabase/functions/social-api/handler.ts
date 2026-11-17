@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getMe, getOrCreateProfile } from './modules/profile/get-me.ts'
 import { updateNickname } from './modules/profile/update-nickname.ts'
 import { createPost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
+import { createComment, deleteComment, listComments } from './modules/comments/comment-service.ts'
 import { authenticate } from './shared/authentication.ts'
 import { authorizeAccount } from './shared/authorization.ts'
 import { ApiError, failure, success } from './shared/response.ts'
@@ -65,6 +66,19 @@ export function createSocialApiHandler(deps: Dependencies) {
       if (body.action === 'listPosts') {
         return success(
           await listPosts(ctx, body.payload, deps.readCursorSecret?.() ?? '', deps.now?.() ?? Date.now()),
+          requestId,
+          headers,
+        )
+      }
+      if (body.action === 'createComment') {
+        return success(await createComment(ctx, body.payload), requestId, headers)
+      }
+      if (body.action === 'deleteComment') {
+        return success(await deleteComment(ctx, body.payload.commentId), requestId, headers)
+      }
+      if (body.action === 'listComments') {
+        return success(
+          await listComments(ctx, body.payload, deps.readCursorSecret?.() ?? '', deps.now?.() ?? Date.now()),
           requestId,
           headers,
         )
