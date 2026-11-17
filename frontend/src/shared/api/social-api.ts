@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CommentPublic, Me, Page, PostPublic, SocialApiClient } from './SocialApiClient.ts'
+import type { CommentPublic, Me, Page, PostPublic, SocialApiClient, UpvoteState } from './SocialApiClient.ts'
 
 export type ClientErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_ERROR'
 const messages = {
@@ -20,9 +20,8 @@ function object(value: unknown): value is Record<string, unknown> {
 function keys(value: Record<string, unknown>, names: string[]) {
   return Object.keys(value).sort().join(',') === names.sort().join(',')
 }
-type ImplementedApi = Omit<SocialApiClient, 'setUpvote'>
-type Action = keyof ImplementedApi
-type Data = Me | { nickname: string } | PostPublic | CommentPublic | Page<PostPublic> | Page<CommentPublic> | { success: true } | { postId: string; status: 'DRAFT' }
+type Action = Exclude<keyof SocialApiClient, 'setUpvote'> | 'toggleUpvote'
+type Data = Me | { nickname: string } | PostPublic | CommentPublic | Page<PostPublic> | Page<CommentPublic> | UpvoteState | { success: true } | { postId: string; status: 'DRAFT' }
 const uuid = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
 function parseComment(value: unknown): CommentPublic {
   if (!object(value) || !keys(value, ['id','postId','body','authorLabel','isOriginalPoster','isMine','createdAt']) ||
@@ -70,6 +69,11 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
   }
   const data = body.data
   if (status !== 200) throw new SocialApiError('INTERNAL_ERROR')
+  if (action === 'toggleUpvote') {
+    if (!object(data) || !keys(data, ['hasUpvoted','upvoteCount']) || typeof data.hasUpvoted !== 'boolean' ||
+      !Number.isSafeInteger(data.upvoteCount) || Number(data.upvoteCount) < 0) throw new SocialApiError('INTERNAL_ERROR')
+    return { hasUpvoted: data.hasUpvoted, upvoteCount: data.upvoteCount as number }
+  }
   if (action === 'createComment') return parseComment(data)
   if (action === 'deleteComment') {
     if (!object(data) || !keys(data,['success']) || data.success !== true) throw new SocialApiError('INTERNAL_ERROR')
@@ -95,7 +99,7 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
   }
   throw new SocialApiError('INTERNAL_ERROR')
 }
-export function createSocialApi(client: SupabaseClient, accessToken?: string): ImplementedApi {
+export function createSocialApi(client: SupabaseClient, accessToken?: string): SocialApiClient {
   async function invoke(action: Action, payload: object) {
     try {
       const { data, error, response } = await client.functions.invoke('social-api', {
@@ -115,6 +119,10 @@ export function createSocialApi(client: SupabaseClient, accessToken?: string): I
     } catch (error) { throw error instanceof SocialApiError ? error : new SocialApiError('INTERNAL_ERROR') }
   }
   return {
+    setUpvote: async (postId, desiredState) => {
+      if (!uuid.test(postId) || typeof desiredState !== 'boolean') throw new SocialApiError('VALIDATION_ERROR')
+      return await invoke('toggleUpvote', { postId, desiredState }) as UpvoteState
+    },
     getMe: async () => await invoke('getMe', {}) as Me,
     updateNickname: async (nickname) => await invoke('updateNickname', { nickname }) as { nickname: string },
     createPost: async (input) => await invoke('createPost', input) as { postId: string; status: 'DRAFT' },

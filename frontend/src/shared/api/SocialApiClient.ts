@@ -59,7 +59,9 @@ export interface CreateCommentInput {
 }
 export interface ListCommentsInput { postId: string; cursor: string | null; limit: number }
 
-// Adapter triển khai profile/post/comment; vote mutation thuộc T09.
+export interface UpvoteState { hasUpvoted: boolean; upvoteCount: number }
+
+// API nghiệp vụ qua Edge Function; không truy cập bảng trực tiếp.
 export interface SocialApiClient {
   getMe(): Promise<Me>
   updateNickname(nickname: string): Promise<{ nickname: string }>
@@ -70,7 +72,7 @@ export interface SocialApiClient {
   listComments(input: ListCommentsInput): Promise<Page<CommentPublic>>
   createComment(input: CreateCommentInput): Promise<CommentPublic>
   deleteComment(commentId: string): Promise<{ success: true }>
-  setUpvote(postId: string, desiredState: boolean): Promise<{ hasUpvoted: boolean; upvoteCount: number }>
+  setUpvote(postId: string, desiredState: boolean): Promise<UpvoteState>
 }
 
 export interface Me {

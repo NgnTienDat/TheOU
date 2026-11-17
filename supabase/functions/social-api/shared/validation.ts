@@ -1,10 +1,12 @@
 import { ApiError } from './response.ts'
 import { type PostRequest, validatePostRequest } from '../modules/posts/post-validation.ts'
 import { type CommentRequest, validateCommentRequest } from '../modules/comments/comment-validation.ts'
+import { type UpvoteInput, validateUpvote } from '../modules/votes/vote-validation.ts'
 
 export type SocialRequest =
   | PostRequest
   | CommentRequest
+  | { action: 'toggleUpvote'; payload: UpvoteInput }
   | { action: 'getMe'; payload: Record<string, never> }
   | {
     action: 'updateNickname'
@@ -68,6 +70,9 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
   }
   if (body.action === 'getMe' && Object.keys(body.payload).length === 0) {
     return { action: 'getMe', payload: {} }
+  }
+  if (body.action === 'toggleUpvote') {
+    return { action: 'toggleUpvote', payload: validateUpvote(body.payload) }
   }
   if (
     body.action === 'updateNickname' && Object.keys(body.payload).length === 1 && 'nickname' in body.payload

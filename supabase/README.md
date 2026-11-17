@@ -1,5 +1,25 @@
 # TheOU — Supabase Database, Auth và Social API
 
+## T09-B.6-A — Cloud concurrency runner local / pending review
+
+Chủ dự án cung cấp kết quả T09-B.1–B.5: UI6/6, migration/security/deploy/smoke và manual A/B count0→1→2→1→0/SQL consistency PASS. Đây không phải agent chạy lại. T09-A bên dưới giữ snapshot triển khai trước Cloud; **T09 chưa COMPLETED**.
+
+Runner mới: `npm.cmd run test:t09-cloud -- --smoke` (bỏ args cũng mặc định smoke), dùng env Auth T03/credentials A/B T06 nhập ẩn hoặc `.env.auth.local` gitignored, CLI native3.1.0 và read-only DB snapshot. Smoke không gửi toggleUpvote. Không dùng secret/service-role cho business API.
+
+Chỉ sau review và phê duyệt riêng, `--write` yêu cầu `THEOU_ALLOW_T09_CLOUD_WRITES=theou-dev` và `THEOU_T09_POST_ID=2cd34597-dd32-40b6-850e-0d62bfe52a2a`, exact dev/ref/baseline cùng scope lock và không có journal chưa giải quyết. Cờ T08 không mở write T09. Chạy một instance trong cửa sổ không có người khác vote/ghi dữ liệu; lock file chỉ chặn runner cùng thư mục, không phải khóa phân tán giữa máy khác.
+
+Baseline được đọc lại trước ghi: users2/profiles2/roles0/posts2 PUBLISHED/comments3 (VISIBLE2/DELETED1), comment counts0/2, votes0 và invariant đúng. Snapshot chỉ hash identity/nội dung. C1–C8 có SQL checkpoints, write-ahead journal và không replay sau lỗi. Kết thúc write dự kiến **giữ một vote A**, trạng thái AWAITING_CLEANUP; đây không phải cleanup đã hoàn tất. Không tự chạy cleanup SQL hoặc rerun toàn batch.
+
+Artifacts `supabase/.temp/t09-votes/<runId>.{json,verify.sql,cleanup.sql,journal.json}` được `.temp` ignore. Khi uncertain, cleanup.sql là script từ chối DELETE; giữ artifacts, review request đang pending và SELECT trước mọi quyết định. Xem [báo cáo/hướng dẫn B.6-A](../docs/reports/T09-B6-A-RUNNER.md). Lượt B.6-A chỉ chạy offline; chưa chạy Cloud smoke/write bằng runner mới.
+
+## T09-A — Atomic Upvote local / pending review
+
+Action `toggleUpvote({postId,desiredState})` dùng guard hiện có, parent PUBLISHED và response đúng `{hasUpvoted,upvoteCount}`. Module `votes/` không public RPC hoặc mở direct-table grants/RLS. True INSERT ON CONFLICT DO NOTHING, false DELETE exact post/caller; AFTER trigger cập nhật count cùng transaction với row thay đổi, không nhân đôi khi replay. Một SELECT nhúng vote theo caller lấy response sau mutation, không trả identity.
+
+Migration mới `20261117094304_t09_atomic_upvotes.sql`: khóa writes vote→post, backfill chỉ count lệch, private SECURITY INVOKER/search_path rỗng/EXECUTE service_role; tăng chỉ khi parent PUBLISHED, rollback khi parent race/error. T02/T03/T06/T08 giữ nguyên. Mixed true/false theo DB execution, không last-request-wins; PGlite không chứng minh lock contention/deadlock thật.
+
+Kiểm tra local T09-A: `npm.cmd run typecheck`, `npm.cmd test` (**193/193 PASS**), Deno check/lint/fmt; SQL thật trên PGlite kiểm tra delta, PK/conflict, rollback, parent đổi trạng thái và quyền bị từ chối. **Chưa push/deploy hoặc chạy Cloud T09.** Review migration và [T09-A/T09-B checklist](../docs/reports/T09-A-IMPLEMENTATION.md) trước bước Cloud riêng; không chạy lại runner/cleanup T06/T08 hoặc sửa dữ liệu được giữ lại.
+
 ## T08 — COMPLETED — PASS (17/11/2026)
 
 Comments API/UI đã nghiệm thu: frontend54/54 và Supabase179/179 offline PASS; deployment/manual/smoke/create/R1 đạt, chủ dự án xác nhận R2 cross-owner/concurrent delete/replay/atomic count cùng cleanup/SQL verification PASS. Final users2/profiles2/posts2 PUBLISHED/comments2 (VISIBLE1/DELETED1), counts1/0, mismatch0, fixtures0. **Giữ hai bài T07/hai comment thủ công T08; không chạy lại runner hoặc cleanup của run đã hoàn tất.** Xem [báo cáo cuối](../docs/reports/T08-STATUS-REPORT.md).

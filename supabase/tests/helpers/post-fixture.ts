@@ -29,6 +29,7 @@ export async function postFixture() {
   await db.exec('set role service_role')
   const state = { now: Date.now(), authError: false, outsideOu: false, unconfirmed: false,
     failTable: '', lostCreate: false, lostComment: false, lostDelete: false, secret: cursorSecret, beforePatch: null as null | (() => Promise<void>), beforeCommentInsert: null as null | (() => Promise<void>), beforeCommentPatch: null as null | (() => Promise<void>), afterCommentRead: null as null | (() => Promise<void>) }
+  const votes = { beforeWrite: null as null | (() => Promise<void>), afterWrite: null as null | (() => Promise<void>), lost: false, malformed: false }
   const calls: { method: string; table: string; query: string }[] = []
   const error = () => Response.json({ code: 'XX000', message: `${serverKey} ${userEmail} SQL stack` }, { status: 503 })
   function filter(url: URL, name: string) { return url.searchParams.get(name)?.replace(/^eq\./, '') }
@@ -64,6 +65,21 @@ export async function postFixture() {
         return Response.json((await db.query('select role from user_roles where user_id=$1 and role=$2', [filter(url, 'user_id'), filter(url, 'role')])).rows)
       }
       if (table === 'post_votes') {
+        if (method === 'POST' || method === 'DELETE') {
+          if (votes.beforeWrite) await votes.beforeWrite()
+          if (method === 'POST') {
+            assert.deepEqual(Object.keys(data!).sort(), ['post_id','user_id'])
+            assert.equal(url.searchParams.get('on_conflict'), 'post_id,user_id')
+            assert.match(headers.get('prefer') ?? '', /resolution=ignore-duplicates/)
+            await db.query('insert into post_votes(post_id,user_id) values($1,$2) on conflict(post_id,user_id) do nothing', [data!.post_id,data!.user_id])
+          } else {
+            assert.ok(filter(url, 'post_id')); assert.ok(filter(url, 'user_id'))
+            await db.query('delete from post_votes where post_id=$1 and user_id=$2', [filter(url,'post_id'),filter(url,'user_id')])
+          }
+          if (votes.afterWrite) await votes.afterWrite()
+          if (votes.lost) { votes.lost = false; return error() }
+          return new Response(null, {status: method === 'POST' ? 201 : 204})
+        }
         assert.equal(method, 'GET')
         assert.equal(url.searchParams.get('select'), 'post_id')
         const ids = url.searchParams.get('post_id')!.slice(4, -1).split(',')
@@ -106,6 +122,14 @@ export async function postFixture() {
         return Response.json(rows.map(row => row.created_at ? { ...row, created_at: iso(row.created_at as string).replace(/Z$/, '+00:00') } : row))
       }
       assert.equal(table, 'posts')
+      if (method === 'GET' && url.searchParams.get('select') === 'upvote_count,post_votes(user_id)') {
+        assert.equal(filter(url,'status'),'PUBLISHED')
+        assert.ok(filter(url,'post_votes.user_id'))
+        if (votes.malformed) return Response.json([{upvote_count:-1,post_votes:[]}])
+        return Response.json((await db.query(`select p.upvote_count,
+          coalesce((select jsonb_agg(jsonb_build_object('user_id',v.user_id)) from post_votes v where v.post_id=p.id and v.user_id=$2),'[]'::jsonb) as post_votes
+          from posts p where p.id=$1 and p.status='PUBLISHED'`,[filter(url,'id'),filter(url,'post_votes.user_id')])).rows)
+      }
       if (method === 'POST') {
         assert.equal(url.searchParams.get('on_conflict'), 'author_id,idempotency_key')
         assert.match(headers.get('prefer') ?? '', /resolution=ignore-duplicates/)
@@ -177,7 +201,7 @@ export async function postFixture() {
   const handler = createSocialApiHandler({ createAuthClient: () => client('sb_publishable_offline'),
     createAdminClient: () => client(serverKey), allowedOrigins: [origin], readCursorSecret: () => state.secret, now: () => state.now })
   return {
-    db, state, calls, handler,
+    db, state, calls, votes, handler,
     request(action: string, payload: unknown, caller: string | null = a, extra: Record<string,string> = {}, signal?: AbortSignal) {
       return new Request('https://offline.example.invalid/functions/v1/social-api', { method: 'POST',
         headers: { 'content-type':'application/json', origin, ...(caller ? { authorization:`Bearer ${token(caller)}` } : {}), ...extra },
@@ -188,6 +212,7 @@ export async function postFixture() {
         update profiles set status='ACTIVE',nickname=case when id='${a}' then 'Nickname A' else 'Nickname B' end;`)
       Object.assign(state, { now: Date.now(), authError:false, outsideOu:false, unconfirmed:false, failTable:'', lostCreate:false, lostComment:false, lostDelete:false, secret:cursorSecret, beforePatch:null, beforeCommentInsert:null, beforeCommentPatch:null, afterCommentRead:null })
       calls.length = 0
+      Object.assign(votes, {beforeWrite:null,afterWrite:null,lost:false,malformed:false})
     },
     async seed(values: { author?: string; status?: string; mode?: string; tag?: string; count?: number; time?: string; id?: string } = {}) {
       const id = values.id ?? randomUUID()

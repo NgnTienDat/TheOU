@@ -21,7 +21,7 @@
 
 **T08 — COMPLETED — PASS (17/11/2026):** Comments API/UI được chủ dự án phê duyệt; frontend54/54, Supabase179/179 offline PASS. Cloud smoke/create/R1 và R2 delete/count đã đạt; chủ dự án xác nhận cleanup sáu fixture, cuối còn hai posts PUBLISHED/hai comments (VISIBLE1/DELETED1), counts1/0, mismatch0. **Giữ hai bài T07 và hai comment thủ công T08**, không cần cleanup thêm. Social UI V2 là thiết kế riêng chưa tích hợp React; không tính hoàn thành V2 hoặc toàn Prototype. Xem [nghiệm thu T08](docs/reports/T08-STATUS-REPORT.md) và [bằng chứng Cloud](docs/reports/T08-B-CLOUD-TESTS.md).
 
-**UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026).** Frontend54/54 và ba browser scripts offline PASS tại A; chủ dự án xác nhận visual6/6 và Cloud read-only regression6/6 PASS tại B. Ghi chú V2 chưa tích hợp trong snapshot nghiệm thu T08 phía trên là trạng thái trước task này. Xem [nghiệm thu UI-V2](docs/reports/UI-V2-STATUS-REPORT.md). **T09 — READY / NOT STARTED**; không suy ra W2/Prototype đã hoàn thành.
+**UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026).** Frontend54/54 và ba browser scripts offline PASS tại A; chủ dự án xác nhận visual6/6 và Cloud read-only regression6/6 PASS tại B. Ghi chú V2 chưa tích hợp trong snapshot nghiệm thu T08 phía trên là trạng thái trước task này. Xem [nghiệm thu UI-V2](docs/reports/UI-V2-STATUS-REPORT.md). **T09-A local completed / pending review**: toggleUpvote/trigger atomic và UI optimistic đã có local; Supabase193/193 và frontend63/63 PASS, chưa deploy/push migration/gọi Cloud. Xem [báo cáo T09-A](docs/reports/T09-A-IMPLEMENTATION.md). Không suy ra T09/W2/Prototype đã hoàn thành.
 
 ```text
 TheOU/

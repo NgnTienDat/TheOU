@@ -223,3 +223,7 @@ html[data-theme=light] .social-app{--fg:#1c1c1f;--muted:#6d6d73;--faint:#98979c;
 .social-app .toast{bottom:calc(var(--mobile-nav-height) + var(--comment-composer-height,0px) + 12px);z-index:80}
 }
 @media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}}
+.upvote-button{min-width:44px;border:0;background:transparent;color:var(--muted);border-radius:9px;cursor:pointer}
+.upvote-button[aria-pressed=true]{color:var(--fg)}.upvote-button[aria-pressed=true] svg{fill:currentColor}
+.upvote-button:hover:not(:disabled){background:var(--surface)}.upvote-button:disabled{opacity:.65}
+.vote-error{position:relative;z-index:3;font-size:12px;line-height:1.6;color:var(--danger)}.vote-error p{margin:8px 0}
