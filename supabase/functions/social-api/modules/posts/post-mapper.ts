@@ -1,4 +1,5 @@
 import { ApiError } from '../../shared/response.ts'
+import type { ImageRow, PublicImage } from '../media/media-service.ts'
 import {
   contactUrl,
   type DisplayMode,
@@ -10,7 +11,7 @@ import {
 
 // Chỉ các cột cần ở Edge; không select * hoặc serialize row qua response.
 export const postColumns =
-  'id,author_id,tag,body,display_mode,nickname_snapshot,contact_url,status,published_at,upvote_count,comment_count,post_images(count)'
+  'id,author_id,tag,body,display_mode,nickname_snapshot,contact_url,status,published_at,upvote_count,comment_count,post_images(id,post_id,storage_path,mime_type,size_bytes,position,status)'
 export interface PostRow {
   id: string
   author_id: string
@@ -23,7 +24,7 @@ export interface PostRow {
   published_at: string
   upvote_count: number
   comment_count: number
-  post_images: { count: number }[]
+  post_images: ImageRow[]
 }
 export interface PostPublic {
   id: string
@@ -37,7 +38,7 @@ export interface PostPublic {
   commentCount: number
   hasUpvoted: boolean
   isMine: boolean
-  images: never[]
+  images: PublicImage[]
 }
 export function mapPost(row: PostRow, viewerId: string, hasUpvoted: boolean): PostPublic {
   if (
@@ -48,7 +49,7 @@ export function mapPost(row: PostRow, viewerId: string, hasUpvoted: boolean): Po
     !timestampPattern.test(row.published_at) || !Number.isFinite(Date.parse(row.published_at)) ||
     !Number.isSafeInteger(row.upvote_count) || row.upvote_count < 0 ||
     !Number.isSafeInteger(row.comment_count) || row.comment_count < 0 ||
-    !Array.isArray(row.post_images) || row.post_images.length !== 1 || row.post_images[0].count !== 0
+    !Array.isArray(row.post_images)
   ) throw new ApiError('INTERNAL_ERROR')
   let url: string | null
   try {

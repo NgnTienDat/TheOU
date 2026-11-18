@@ -5,8 +5,13 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'INTERNAL_ERROR'
+  | 'UPLOAD_ERROR'
 
 const errors = {
+  UPLOAD_ERROR: {
+    status: 422,
+    message: 'Chưa thể xác nhận hoặc tải ảnh. Vui lòng thử lại hoặc gỡ ảnh khỏi bản nháp.',
+  },
   UNAUTHENTICATED: {
     status: 401,
     message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',

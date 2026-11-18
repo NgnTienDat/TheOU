@@ -4,6 +4,7 @@ import { updateNickname } from './modules/profile/update-nickname.ts'
 import { createPost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
 import { createComment, deleteComment, listComments } from './modules/comments/comment-service.ts'
 import { toggleUpvote } from './modules/votes/vote-service.ts'
+import { createImageUpload, finalizeImage, removeDraftImage } from './modules/media/media-service.ts'
 import { authenticate } from './shared/authentication.ts'
 import { authorizeAccount } from './shared/authorization.ts'
 import { ApiError, failure, success } from './shared/response.ts'
@@ -54,6 +55,24 @@ export function createSocialApiHandler(deps: Dependencies) {
         userId: user.id,
         profile,
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),
+        now: deps.now?.() ?? Date.now(),
+      }
+      if (body.action === 'createImageUpload') {
+        return success(await createImageUpload(ctx, body.payload), requestId, headers)
+      }
+      if (body.action === 'finalizeImage') {
+        return success(
+          await finalizeImage(ctx, body.payload.postId, body.payload.imageId),
+          requestId,
+          headers,
+        )
+      }
+      if (body.action === 'removeDraftImage') {
+        return success(
+          await removeDraftImage(ctx, body.payload.postId, body.payload.imageId),
+          requestId,
+          headers,
+        )
       }
       if (body.action === 'createPost') {
         return success(await createPost(ctx, body.payload), requestId, headers)

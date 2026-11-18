@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { signedImages } from '../media/media-service.ts'
 import type { Profile } from '../profile/get-me.ts'
 import { ApiError } from '../../shared/response.ts'
 import { assertCursorSecret, decodeCursor, encodeCursor } from './post-cursor.ts'
@@ -10,6 +11,7 @@ interface Context {
   userId: string
   profile: Profile
   signal: AbortSignal
+  now?: number
 }
 async function publicPosts(ctx: Context, rows: PostRow[]): Promise<PostPublic[]> {
   const posts = rows.map((row) => mapPost(row, ctx.userId, false))
@@ -18,7 +20,13 @@ async function publicPosts(ctx: Context, rows: PostRow[]): Promise<PostPublic[]>
     .eq('user_id', ctx.userId).in('post_id', posts.map((post) => post.id)).abortSignal(ctx.signal)
   if (error || !Array.isArray(data)) throw new ApiError('INTERNAL_ERROR')
   const votes = new Set(data.map((row) => row.post_id))
-  return posts.map((post) => ({ ...post, hasUpvoted: votes.has(post.id) }))
+  return await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      hasUpvoted: votes.has(post.id),
+      images: await signedImages(ctx.client, rows[i], ctx.now ?? Date.now()),
+    })),
+  )
 }
 
 export async function createPost(ctx: Context, input: CreatePostInput) {

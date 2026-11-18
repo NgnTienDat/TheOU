@@ -24,7 +24,7 @@
 | `UPLOAD_ERROR` | Upload/verify ảnh thất bại | Thử lại không đăng trùng |
 | `INTERNAL_ERROR` | Lỗi hệ thống | Thông báo chung và request ID |
 
-Status HTTP tương ứng nếu có: 401/403/400/404/409/429/500. Không đưa SQL, JWT hoặc email của người khác vào `details`.
+Status HTTP tương ứng nếu có: 401/403/400/404/409/429/500; `UPLOAD_ERROR` dùng 422 trong T10. Không đưa SQL, JWT hoặc email của người khác vào `details`.
 
 ### Hợp đồng Auth — yêu cầu T03 cập nhật 15/11/2026
 
@@ -105,6 +105,7 @@ interface Page<T> { items: T[]; nextCursor: string | null; }
 | `createPost` | `{body,tag,displayMode,contactUrl?,idempotencyKey}` | `{postId,status:'DRAFT'}` | W1 |
 | `createImageUpload` | `{postId,mimeType,sizeBytes,position}` | `{imageId,path,token}` | W2 |
 | `finalizeImage` | `{postId,imageId}` | `{imageId,status:'READY'}` | W2 |
+| `removeDraftImage` | `{postId,imageId}` | `{success:true}` | W2 — T10 |
 | `publishPost` | `{postId}` | `PostPublic` | W1–W2 |
 | `deletePost` | `{postId}` | `{success:true}` | W2 |
 | `listComments` | `{postId,cursor:null,limit:20}` | `Page<CommentPublic>` | W2 |
@@ -127,7 +128,7 @@ POST JSON `{ "action": "getMe", "payload": {} }`; không chấp nhận field th�
 
 Data đúng ba trường `{ "nickname": "OUer-1234", "emailMasked": "***@ou.edu.vn", "isAdmin": false }`, không trả UUID/email đầy đủ/metadata. EmailMasked chỉ thuộc chính chủ; che toàn bộ local part để không lộ MSSV. Profile thiếu được insert an toàn, giữ hàng thắng khi concurrent/retry; profile đã tồn tại không bị thay đổi. Role ADMIN chỉ đọc từ DB.
 
-OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả401 trước handler; adapter chuẩn hóa lỗi gateway. T06 đã nghiệm thu bốn action post; T08-A thêm local ba action comment. Vote/media/deletePost/moderation vẫn là thiết kế.
+OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; không có action dữ liệu public. CORS theo origin đầy đủ trong THEOU_ALLOWED_ORIGINS, mặc định localhost/127.0.0.1:5173; CORS không thay thế JWT. Response handler có Cache-Control: no-store, requestId UUID do server tạo. Gateway giữ verify_jwt=true và có thể trả401 trước handler; adapter chuẩn hóa lỗi gateway. Post/comment/vote đã nghiệm thu T06/T08/T09; Media T10-A mới local. DeletePost/moderation vẫn là thiết kế.
 
 ### T06 — bốn action post text đã nghiệm thu
 
@@ -140,6 +141,20 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
 - Cursor tối đa 1.024 ký tự, ký HMAC-SHA256 với secret chỉ ở Edge `THEOU_POST_CURSOR_SECRET` (base64url ngẫu nhiên tối thiểu 32 byte, 43–128 ký tự). Gắn sort/tag, mốc trên lần đọc đầu, tuple cuối và version; hạn 15 phút, không chứa author ID/email. Client coi cursor là opaque; giả/sai định dạng/hết hạn/đổi filter trả VALIDATION_ERROR/400, cấu hình thiếu secret trả INTERNAL_ERROR/500. Đổi secret làm cursor cũ hết hiệu lực; tải lại từ cursor null.
 - Mốc trên loại bài mới hơn lần đọc đầu; không khóa trạng thái/count của feed. Anchor bị ẩn/xóa vẫn dùng tuple cursor; HOT có thể lặp/bỏ sót khi votes thay đổi và cutoff 24 giờ dịch chuyển. T07 dedupe theo post.id và refresh; **không có snapshot consistency**.
 - Query nghiệp vụ post dùng chung deadline 10 giây sau guard và signal hủy request; lỗi trả INTERNAL_ERROR/500. Timeout không bảo đảm DB chưa commit: retry create bằng cùng key/payload, publish bằng cùng postId. Deadline này không phải timeout toàn bộ pipeline Auth/đọc request.
+
+### T10-A — Media local, chưa cấu hình hoặc nghiệm thu Cloud
+
+T10 thay chốt text-only T06 bằng vòng đời sau; các kết quả nghiệm thu T06–T09 vẫn là snapshot lịch sử. Không triển khai deletePost/moderation trong T10.
+
+- Cả ba Media actions qua guard JWT thật, OU confirmed/ACTIVE và own DRAFT. Payload exact allowlist; không nhận path, bucket, author, status hoặc role. Missing/cross-owner cùng NOT_FOUND/404; không còn DRAFT trả CONFLICT/409.
+- `createImageUpload`: MIME đúng JPG/PNG/WebP, size nguyên1–2097152, position1/2. INSERT PENDING với UUID server; retry cùng slot/MIME/size trả cùng imageId/path và token mới. Khác khai báo hoặc slot REMOVING trả CONFLICT. Không overwrite metadata. Lỗi cấp token giữ PENDING để retry/gỡ, không tạo slot mới. Đây là idempotency theo slot và khai báo, không phải fingerprint nội dung file.
+- Upload ACK `{imageId,path,token}` chỉ gửi cho chủ bản nháp. Path `posts/{postId}/{randomImageId}.{jpg|png|webp}` không chứa Auth UUID/email/tên file gốc. SDK frontend chỉ `uploadToSignedUrl(path,token,processedBlob,{contentType,upsert:false})`; không fallback upload công khai. Token hiện có hạn2giờ theo Storage; giữ trong bộ nhớ, không log/persist.
+- `finalizeImage`: đọc object `info` và download từ bucket cố định bằng quyền server; kiểm tra bucket/path, actual size/contentType và magic/container bytes với reservation. Thiếu/mismatch/lỗi Storage trả UPLOAD_ERROR/422, không READY. Đây không phải full decoder/antivirus. READY retry vẫn kiểm tra object; transition chỉ còn own DRAFT và trạng thái hợp lệ.
+- `removeDraftImage`: chuyển PENDING/READY→REMOVING trong DB trước, xóa đúng một path qua Storage API, rồi REMOVED. Publish bị chặn khi REMOVING. Lỗi/mất ACK retry cùng imageId; không reset count hoặc xóa prefix. Tombstone giữ ID/path, giải phóng slot bằng partial unique index; không cho token/finalize cũ phục hồi row. Token cũ có thể upload lại orphan sau remove; không thể publish orphan qua metadata đã REMOVED. Dọn orphan cần review riêng sau hạn token, scheduler thuộc T17.
+- Trigger media khóa parent cùng publish và recheck DRAFT/ACTIVE; immutable MIME/size/position/path. Không giữ SQL transaction trong lúc gọi Storage. Publish chỉ chấp nhận0–2 READY và bỏ qua REMOVED; snapshot nickname/publishedAt của T06 giữ nguyên. PENDING/REMOVING hoặc DB error không bị coi là success.
+- `listPosts/getPost/publishPost` chỉ ký READY của post đã authorize PUBLISHED, thứ tự position; `PublicImage` đúng `{id,signedUrl,expiresAt}`, TTL300giây. Không trả path riêng, upload token hoặc identity. Lỗi ký URL trả lỗi an toàn, không giả `images=[]`; text-only không gọi Storage. Signed read URL vẫn chứa đường dẫn post/image công khai và capability token, không Auth UUID. URL có thể còn dùng tới TTL/cache dù logout hoặc bài bị ẩn; không bảo đảm thu hồi tức thì.
+- UI xử lý lại pixels trước upload, giữ cùng canonical post/key/processed blob khi retry; lỗi ảnh thứ hai không upload lại ảnh READY. Mất ACK upload thử finalize trước, không upsert. Upload chờ tối đa30giây ở adapter; SDK request có thể còn chạy sau timeout, nên không suy ra rollback. Sau lần publish đầu khóa attachments và chỉ retry publish cùng postId. Không khôi phục toàn bộ pipeline sau reload/rời trang.
+- Gallery dùng placeholder/error/expiry và nút tải lại tối đa3lần/mount qua getPost đã authorize. Không background retry vô hạn hoặc log URL; đổi phiên/unmount bỏ kết quả cũ. Đọc lại riêng images không ghi đè optimistic upvote/count trong query cache.
 
 ## 4. Các thao tác cần atomic và idempotent
 
@@ -205,7 +220,7 @@ OPTIONS cho origin Vite được cho phép trả 204, không đọc Auth/DB; kh�
 
 ## 7. API Adapter phía frontend
 
-`frontend/src/shared/api/SocialApiClient.ts` giữ interface/input/DTO. Factory `createSocialApi` dùng functions.invoke/runtime allowlist/lỗi an toàn. Post API T06 và Feed/Composer T07 đã nghiệm thu; T08-A thêm local adapter đủ list/create/deleteComment và detail UI. Không raw-table access. Vote/media chưa có adapter thực thi.
+`frontend/src/shared/api/SocialApiClient.ts` giữ interface/input/DTO. Factory `createSocialApi` dùng functions.invoke/runtime allowlist/lỗi an toàn. Post/Comment/Upvote đã nghiệm thu theo T06–T09; T10-A bổ sung local createImageUpload/uploadImage/finalizeImage/removeDraftImage và PublicImage runtime validation. Không raw-table access; uploadImage chỉ là adapter Storage signed upload, không action social-api mới.
 
 ```ts
 interface SocialApiClient {

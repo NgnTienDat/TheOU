@@ -100,6 +100,13 @@ try {
     for (let n = 0; n < 100 && !held; n++) await page.waitForTimeout(10)
     assert.ok(held, 'request đã tới mock')
   }
+  async function waitPending() {
+    // Request tới mock chưa bảo đảm React đã commit notify của mutation cache.
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.upvote-button')
+      return button?.getAttribute('aria-pressed') === 'true' && button.getAttribute('aria-busy') === 'true' && button.disabled && /^4/.test(button.textContent)
+    })
+  }
   async function back() { await page.getByRole('link', { name: 'Bảng tin', exact: true }).click(); await button().waitFor() }
   await mkdir(artifacts, { recursive: true })
   await page.goto(origin); await page.waitForURL('**/dang-nhap'); await login(); await state(false, 3)
@@ -107,6 +114,7 @@ try {
 
   mode = 'hold'; held = false; const before = calls.length
   await button().click(); await waitHeld()
+  await waitPending()
   assert.equal(new URL(page.url()).pathname, '/')
   assert.equal(await button().getAttribute('aria-pressed'), 'true')
   assert.equal(await button().getAttribute('aria-busy'), 'true')
@@ -117,6 +125,7 @@ try {
   for (const theme of ['dark', 'light']) await shot('pending', 390, theme)
   await page.getByRole('link', { name: 'Mở bài viết và bình luận', exact: true }).first().click()
   await page.locator('.post-thread .upvote-button').waitFor()
+  await waitPending()
   assert.equal(await button().getAttribute('aria-pressed'), 'true', 'Detail đang chờ giữ intent của Feed')
   assert.match(await button().textContent(), /^4/)
   assert.equal(await button().isDisabled(), true)

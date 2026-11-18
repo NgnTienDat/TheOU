@@ -176,13 +176,15 @@ test('migration trên PostgreSQL tạm — không phải Supabase Cloud', async 
   })
 
   await t.test('ảnh: giới hạn 2 vị trí, kích thước, MIME và path không chứa user UUID', async () => {
+    const post = randomUUID()
+    await db.query(`insert into public.posts(id,author_id,body,tag,display_mode,idempotency_key) values($1,$2,'Ảnh local','CONFESSION','ANONYMOUS',$3)`,[post,a,randomUUID()])
     const first = randomUUID()
     const second = randomUUID()
     for (const [id, position] of [[first, 1], [second, 2]] as const) {
       await db.query(`insert into public.post_images (id, post_id, storage_path, mime_type, size_bytes, position)
         values ($1, $2, $3, 'image/webp', 1024, $4)`, [id, post, `posts/${post}/${id}.webp`, position])
     }
-    await reject('update public.post_images set position = 2 where id = $1', [first], '23505')
+    await reject('update public.post_images set position = 2 where id = $1', [first], '23514')
     await reject('update public.post_images set position = 3 where id = $1', [first], '23514')
     await reject('update public.post_images set size_bytes = 2097153 where id = $1', [first], '23514')
     await reject(`update public.post_images set mime_type = 'image/gif' where id = $1`, [first], '23514')

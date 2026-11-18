@@ -31,6 +31,7 @@ export async function postFixture() {
     failTable: '', lostCreate: false, lostComment: false, lostDelete: false, secret: cursorSecret, beforePatch: null as null | (() => Promise<void>), beforeCommentInsert: null as null | (() => Promise<void>), beforeCommentPatch: null as null | (() => Promise<void>), afterCommentRead: null as null | (() => Promise<void>) }
   const votes = { beforeWrite: null as null | (() => Promise<void>), afterWrite: null as null | (() => Promise<void>), lost: false, malformed: false }
   const calls: { method: string; table: string; query: string }[] = []
+  const storage = { objects:new Map<string,Blob>(), fail:'', lost:'', bucketPatch:{} as Record<string,unknown>, infoPatch:{} as Record<string,unknown>, calls:[] as {operation:string;path:string}[], before:null as null|(()=>Promise<void>) }
   const error = () => Response.json({ code: 'XX000', message: `${serverKey} ${userEmail} SQL stack` }, { status: 503 })
   function filter(url: URL, name: string) { return url.searchParams.get(name)?.replace(/^eq\./, '') }
   const fetchMock: typeof fetch = async (input, init) => {
@@ -48,6 +49,32 @@ export async function postFixture() {
     }
     assert.equal(headers.get('apikey'), serverKey)
     assert.equal(headers.get('authorization'), `Bearer ${serverKey}`)
+    if(url.pathname.startsWith('/storage/v1/')) {
+      const part=url.pathname.slice('/storage/v1/'.length)
+      const operation=part.startsWith('bucket/')?'bucket':part.startsWith('object/upload/sign/')?'uploadSign':part.startsWith('object/info/')?'info':part.startsWith('object/sign/')?'readSign':init?.method==='DELETE'?'remove':'download'
+      const path=part.replace(/^(bucket\/|object\/upload\/sign\/post-media\/|object\/info\/post-media\/|object\/sign\/post-media\/|object\/post-media\/)/,'')
+      storage.calls.push({operation,path})
+      if(storage.before) await storage.before()
+      if(storage.fail===operation) return error()
+      if(operation==='bucket') return Response.json({id:'post-media',public:storage.fail==='public',file_size_limit:2097152,allowed_mime_types:['image/jpeg','image/png','image/webp'],...storage.bucketPatch})
+      if(operation==='uploadSign') {
+        assert.notEqual(headers.get('x-upsert'),'true')
+        return Response.json({url:`/object/upload/sign/post-media/${path}?token=offline-upload-token`})
+      }
+      if(operation==='readSign') {assert.equal(JSON.parse(String(init?.body)).expiresIn,300);return Response.json({signedURL:`/object/sign/post-media/${path}?token=offline-read-token`})}
+      if(operation==='remove') {
+        const {prefixes}=JSON.parse(String(init?.body)); assert.equal(prefixes.length,1)
+        assert.equal((await db.query<{n:number}>("select count(*)::integer n from post_images where storage_path=$1 and status in ('REMOVING','REMOVED')",[prefixes[0]])).rows[0].n,1,'Only delete a path backed by the guarded removal row')
+        if(storage.fail==='removeMissing') return Response.json({code:'NoSuchKey',message:'Missing object',statusCode:'404'},{status:404})
+        storage.objects.delete(prefixes[0])
+        if(storage.lost==='remove') {storage.lost='';return error()}
+        return Response.json([])
+      }
+      const blob=storage.objects.get(path)
+      if(!blob) return Response.json({message:'Object not found',statusCode:'404',error:'NoSuchKey'},{status:404})
+      if(operation==='info') return Response.json({name:path,bucket_id:'post-media',size:blob.size,content_type:blob.type,...storage.infoPatch})
+      return new Response(blob,{headers:{'content-type':blob.type}})
+    }
     const table = url.pathname.replace('/rest/v1/', '')
     const method = init?.method ?? 'GET'
     calls.push({ method, table, query: url.search })
@@ -55,6 +82,27 @@ export async function postFixture() {
     if (init?.signal?.aborted) throw new DOMException('Offline timeout', 'AbortError')
     const data = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null
     try {
+      if(table==='post_images') {
+        if(method==='POST') {
+          assert.deepEqual(Object.keys(data!).sort(),['id','mime_type','position','post_id','size_bytes','storage_path'])
+          await db.query(`insert into post_images(id,post_id,storage_path,mime_type,size_bytes,position) values($1,$2,$3,$4,$5,$6)`,[data!.id,data!.post_id,data!.storage_path,data!.mime_type,data!.size_bytes,data!.position])
+          if(storage.lost==='reserve') {storage.lost='';return error()}
+          return new Response(null,{status:201})
+        }
+        if(method==='PATCH') {
+          assert.deepEqual(Object.keys(data!),['status']); assert.ok(filter(url,'id')); assert.ok(filter(url,'post_id'));assert.ok(filter(url,'status'))
+          const r=await db.query('update post_images set status=$1 where id=$2 and post_id=$3 and status=$4 returning id',[data!.status,filter(url,'id'),filter(url,'post_id'),filter(url,'status')])
+          if(storage.lost===data!.status) {storage.lost='';return error()}
+          return Response.json(r.rows)
+        }
+        assert.equal(method,'GET')
+        const params:unknown[]=[];const where:string[]=[]
+        for(const name of ['id','post_id','position','status']) {
+          const value=url.searchParams.get(name); if(!value)continue
+          assert.match(value,/^(eq|neq)\./);params.push(value.slice(value.indexOf('.')+1));where.push(`${name}${value.startsWith('neq.')?'<>':'='}$${params.length}`)
+        }
+        return Response.json((await db.query(`select id,post_id,storage_path,mime_type,size_bytes,position,status from post_images where ${where.join(' and ')}`,params)).rows)
+      }
       if (table === 'profiles') {
         assert.equal(method, 'GET')
         assert.equal(url.searchParams.get('select'), 'nickname,status')
@@ -142,7 +190,7 @@ export async function postFixture() {
       }
       const columns = `p.id,p.author_id,p.tag,p.body,p.display_mode,p.nickname_snapshot,p.contact_url,p.status,
         p.published_at::text,p.upvote_count,p.comment_count,
-        jsonb_build_array(jsonb_build_object('count',(select count(*) from post_images where post_id=p.id))) as post_images`
+        coalesce((select jsonb_agg(jsonb_build_object('id',i.id,'post_id',i.post_id,'storage_path',i.storage_path,'mime_type',i.mime_type,'size_bytes',i.size_bytes,'position',i.position,'status',i.status)) from post_images i where i.post_id=p.id),'[]'::jsonb) as post_images`
       if (method === 'PATCH') {
         assert.deepEqual(data, { status: 'PUBLISHED' })
         assert.equal(filter(url, 'status'), 'DRAFT')
@@ -179,12 +227,12 @@ export async function postFixture() {
           : `(p.upvote_count,p.published_at,p.id)<($${offset+1}::integer,$${offset+2}::timestamptz,$${offset+3}::uuid)`)
       }
       const select = url.searchParams.get('select')
-      assert.ok(select === postColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id')
+      assert.ok(select === postColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id' || select === 'id,author_id,status')
       const order = url.searchParams.get('order')
       if (order) assert.ok(['published_at.desc,id.desc','upvote_count.desc,published_at.desc,id.desc'].includes(order))
       const limit = url.searchParams.get('limit')
       if (limit) assert.ok(Number.isInteger(Number(limit)) && Number(limit) >= 2 && Number(limit) <= 21)
-      const result = await db.query<Record<string,unknown>>(`select ${select === postColumns ? columns : select === 'id,author_id' ? 'p.id,p.author_id' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
+      const result = await db.query<Record<string,unknown>>(`select ${select === postColumns ? columns : select === 'id,author_id' ? 'p.id,p.author_id' : select === 'id,author_id,status' ? 'p.id,p.author_id,p.status' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
         ${where.length ? `where ${where.join(' and ')}` : ''}
         ${order ? `order by ${order.split(',').map(value => 'p.'+value.replace('.', ' ')).join(',')}` : ''} ${limit ? `limit ${Number(limit)}` : ''}`, params)
       return Response.json(result.rows.map(row => row.published_at ? { ...row, published_at: iso(row.published_at as string) } : row))
@@ -201,17 +249,18 @@ export async function postFixture() {
   const handler = createSocialApiHandler({ createAuthClient: () => client('sb_publishable_offline'),
     createAdminClient: () => client(serverKey), allowedOrigins: [origin], readCursorSecret: () => state.secret, now: () => state.now })
   return {
-    db, state, calls, votes, handler,
+    db, state, calls, votes, storage, handler,
     request(action: string, payload: unknown, caller: string | null = a, extra: Record<string,string> = {}, signal?: AbortSignal) {
       return new Request('https://offline.example.invalid/functions/v1/social-api', { method: 'POST',
         headers: { 'content-type':'application/json', origin, ...(caller ? { authorization:`Bearer ${token(caller)}` } : {}), ...extra },
         body: JSON.stringify({ action, payload }), signal })
     },
     async reset() {
-      await db.exec(`delete from comments; delete from post_votes; delete from post_images; delete from posts; delete from user_roles;
+      await db.exec(`reset role; truncate posts cascade; set role service_role; delete from user_roles;
         update profiles set status='ACTIVE',nickname=case when id='${a}' then 'Nickname A' else 'Nickname B' end;`)
       Object.assign(state, { now: Date.now(), authError:false, outsideOu:false, unconfirmed:false, failTable:'', lostCreate:false, lostComment:false, lostDelete:false, secret:cursorSecret, beforePatch:null, beforeCommentInsert:null, beforeCommentPatch:null, afterCommentRead:null })
       calls.length = 0
+      storage.objects.clear();storage.calls.length=0;Object.assign(storage,{fail:'',lost:'',before:null,bucketPatch:{},infoPatch:{}})
       Object.assign(votes, {beforeWrite:null,afterWrite:null,lost:false,malformed:false})
     },
     async seed(values: { author?: string; status?: string; mode?: string; tag?: string; count?: number; time?: string; id?: string } = {}) {

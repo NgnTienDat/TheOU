@@ -119,7 +119,9 @@ Future moderation/cleanup nhiều bảng phải review thứ tự khóa (vote/co
 
 ### `post_images`
 
-`id uuid PK`, `post_id uuid FK`, `storage_path text` **nội bộ**, `mime_type text`, `size_bytes int`, `position smallint (1..2)`, `status ('PENDING','READY')`, `created_at`. `UNIQUE(post_id,position)`; chỉ ảnh `READY` được xuất qua API; `post_images` không có email/MSSV trong tên file. `storage_path`: `posts/{post_uuid}/{image_uuid}.webp` hoặc định dạng cho phép.
+`id uuid PK`, `post_id uuid FK`, `storage_path text` **nội bộ**, `mime_type text`, `size_bytes int`, `position smallint (1..2)`, `created_at`. T02 có PENDING/READY và UNIQUE(post_id,position); migration local T10 `20261117155535_t10_private_post_images.sql` thêm REMOVING/REMOVED, thay unique bằng index partial `WHERE status <> 'REMOVED'`. Giữ tombstone để finalize cũ không sống lại; chỉ READY xuất qua API. `storage_path`: `posts/{post_uuid}/{random_image_uuid}.{jpg|png|webp}`, không email/MSSV/Auth UUID/tên file gốc.
+
+Trigger private T10 SECURITY INVOKER/search_path rỗng, EXECUTE chỉ service_role, không mở RPC/grants/RLS. Khi INSERT/UPDATE/DELETE image, khóa parent FOR NO KEY UPDATE rồi recheck DRAFT và profile ACTIVE; publish cũng khóa parent qua UPDATE. Metadata MIME/size/position/path bất biến, REMOVED không phục hồi. Storage verify/delete nằm ngoài transaction; finalize chuyển READY sau proof, remove đánh dấu REMOVING trước Storage delete và chỉ giải phóng slot sau REMOVED. Publish từ chối PENDING/REMOVING, chấp nhận0/1/2 READY. Row locks/partial unique là cơ chế, PGlite chưa chứng minh contention/deadlock PostgreSQL nhiều connection; T10-B cần kiểm thử race thật. Không đổi migration cũ.
 
 ### `reports` — MVP W3
 
@@ -174,6 +176,12 @@ Không tạo index tràn lan trước khi đo query thực tế.
 - Tài khoản admin được cấp qua seed/migration/bảng vai trò bởi người vận hành, không phải tự đăng ký từ UI.
 
 ### Storage
+
+**T10-A local:** chưa tạo bucket/policy trên Cloud. T10-B phải review qua Dashboard/Storage API `post-media`, public=false, fileSizeLimit=2097152, allowedMimeTypes đúng image/jpeg,image/png,image/webp. Server adapter fail closed nếu cấu hình bucket lệch. Không thêm policy upload/list/read/delete tổng quát cho browser; signed capabilities do server cấp sau authorization. Không ghi trực tiếp storage.objects; không dùng public bucket hoặc public URL fallback.
+
+Finalize kiểm tra info bucket/path/size/contentType, download đúng object và magic/container bytes; không coi MIME browser là proof. Đây chưa phải antivirus/full decoder hoặc kiểm chứng không có mọi metadata khi client cố bypass canvas. Canvas frontend loại metadata gốc bằng reencode; nội dung hình vẫn có thể tự lộ thông tin cá nhân.
+
+Remove retry giữ REMOVING khi Storage lỗi và cấm publish; exact path delete, tombstone REMOVED chặn finalize cũ. Signed upload token có thể còn hiệu lực sau gỡ, tạo orphan; cleanup thủ công phải đối chiếu DB/path/tuổi token/object trước thao tác và được duyệt riêng. Scheduler/retention/throttling thuộc T17/T16, chưa triển khai T10-A. Signed URL/token không được log, lưu analytics hoặc persist vào storage frontend.
 
 - Bucket `post-media` đặt **private**, chỉ JPG/PNG/WebP và giới hạn kích thước. Ảnh đọc dùng signed URL TTL mặc định 5 phút; token tải lên có thể còn hiệu lực tối đa theo quy định của Supabase (hiện 2 giờ), vì vậy phải kiểm tra quyền cả ở khâu cấp token và khi hoàn tất/publish.
 - Signed upload token được tạo **sau khi API xác minh quyền sở hữu DRAFT**; path server tạo bằng UUID ngẫu nhiên không chứa định danh.

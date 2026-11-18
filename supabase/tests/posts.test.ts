@@ -287,13 +287,13 @@ test('cursor HMAC: tamper/claims/filter/TTL/length/secret; signed payload không
 
 test('mapper chỉ allowlist, ảnh không có không được giả tạo, snapshot khác profile và private fields không serialize', () => {
   const row: PostRow & Record<string,unknown>={id:randomUUID(),author_id:a,body:'Nội dung',tag:'CONFESSION',display_mode:'ANONYMOUS',
-    nickname_snapshot:null,contact_url:null,status:'PUBLISHED',published_at:'2026-11-16T12:00:00.123456+00:00',upvote_count:0,comment_count:0,post_images:[{count:0}],
+    nickname_snapshot:null,contact_url:null,status:'PUBLISHED',published_at:'2026-11-16T12:00:00.123456+00:00',upvote_count:0,comment_count:0,post_images:[],
     email:userEmail,user_metadata:{secret:serverKey},storage_path:'private/path',created_at:'private'}
   const post=mapPost(row,b,false)
   assert.deepEqual(Object.keys(post).sort(),publicKeys)
   for(const value of [a,userEmail,serverKey,'private/path','author_id','user_metadata']) assert.equal(JSON.stringify(post).includes(value),false)
   assert.equal(post.publishedAt,'2026-11-16T12:00:00.123456Z')
-  assert.throws(()=>mapPost({...row,post_images:[{count:1}]},b,false),ApiError)
+  assert.throws(()=>mapPost({...row,post_images:null as unknown as PostRow['post_images']},b,false),ApiError)
   assert.throws(()=>mapPost({...row,nickname_snapshot:'Bí mật'},b,false),ApiError)
   assert.throws(()=>mapPost({...row,status:'DRAFT'},b,false),ApiError)
   assert.throws(()=>mapPost({...row,upvote_count:-1},b,false),ApiError)

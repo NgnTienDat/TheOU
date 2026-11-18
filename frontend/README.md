@@ -68,3 +68,10 @@ T09-A giữ API trong adapter: `setUpvote(postId,desiredState)` gọi action `to
 Mọi dữ liệu nghiệp vụ phải đi qua Edge Function `social-api`; không dùng `.from(...)` đọc/ghi bảng trong frontend. Cấu hình Supabase nằm tại `../supabase/`; đặc tả nằm tại `../docs/`.
 
 Tài liệu tích hợp: [Tailwind + Vite](https://tailwindcss.com/docs/installation/using-vite), [React Router](https://reactrouter.com/start/declarative/installation), [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/quick-start), [Supabase Client](https://supabase.com/docs/reference/javascript/initializing).
+# T10-A — Ảnh private (local)
+
+Composer xử lý JPG/PNG/WebP bằng canvas, tối đa2 ảnh, ≤2MiB/ảnh sau xử lý; input tối đa16MiB/40MP, cạnh≤16384, resize cạnh dài≤2048. API adapter gọi reserve/signed upload/finalize trước publish; không component nào gọi Supabase trực tiếp. Preview, Blob, token và trạng thái retry chỉ trong bộ nhớ. Đổi phiên bỏ callbacks cũ; reload/rời trang chưa recovery pipeline.
+
+Gallery Feed/Detail dùng PublicImage signed URL300giây, placeholder/error/expiry và tải lại tối đa3lần/mount; không public URL fallback hoặc log URL. Timeout upload30giây có thể là unknown commit; retry finalize trước, cùng post/key/blob, không upsert. Sau bắt đầu publish không đổi attachments.
+
+`npm.cmd run test:ui:media` chạy Edge/Playwright với Auth/API/Storage giả, chặn mạng ngoài host local/offline; ảnh tại `node_modules/.cache/theou-media-ui/`. Không gọi Cloud. Chạy cùng các scripts Auth/Feed/Comments/Upvote khi review T10. Bucket/migration/deploy chỉ sau review T10-B; xem [báo cáo](../docs/reports/T10-A-IMPLEMENTATION.md).

@@ -263,3 +263,20 @@ Không chạy `supabase start`, `db reset`, SQL Editor hoặc test ghi Cloud t�
 **Điểm dừng hiện tại:** T02 COMPLETED; đã cập nhật tài liệu sau xác minh cleanup read-only. Không triển khai T03 trong lượt này. Các lệnh preview/deployment phía trên là tham khảo, không push lại migration đã áp dụng.
 
 Nguồn đối chiếu: [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [grants và default privileges](https://supabase.com/docs/guides/api/securing-your-api), [CLI v3](https://supabase.com/changelog/supabase-cli-v3), [PGlite](https://pglite.dev/docs/).
+# T10-A — Private post media, local only
+
+Migration mới `20261117155535_t10_private_post_images.sql` giữ bảng/grants/RLS T02, thêm REMOVING/REMOVED và partial unique slot. Trigger media khóa parent/recheck DRAFT/ACTIVE, không gọi Storage trong transaction; publish chỉ chấp nhận0–2 READY và bỏ REMOVED. Không sửa migrations T02/T03/T06/T08/T09.
+
+Ba actions createImageUpload/finalizeImage/removeDraftImage dùng guard hiện có, own DRAFT và exact payload. Storage adapter kiểm tra bucket private, MIME/size, actual object info và magic bytes trước READY; reads ký TTL300giây sau PUBLISHED authorization. UPLOAD_ERROR trả422 an toàn, không giả images rỗng. Token upload2giờ theo SDK/docs; không thể coi xóa object là thu hồi token. Tombstone chặn finalize cũ; orphan do token cũ cần review cleanup riêng sau expiry, scheduler T17 chưa triển khai.
+
+T10-B sau review: kiểm tra exact TheOU-dev/ref; tạo/review bucket qua Dashboard/Storage API với cấu hình `{public:false,fileSizeLimit:2097152,allowedMimeTypes:['image/jpeg','image/png','image/webp']}` và không mở policy browser chung. Không sửa storage.objects trực tiếp. Sau đó mới review push migration/deploy và Cloud lifecycle/race tests. T10-A không thực hiện bất cứ bước Cloud nào; xem [bàn giao](../docs/reports/T10-A-IMPLEMENTATION.md).
+
+## T10-C.1-A — Runner media chuẩn bị local
+
+Theo xác nhận của chủ dự án, T10-B đã cấu hình bucket, áp dụng migration R1, deploy và manual read-only smoke A/B đạt6/6. Lượt C.1-A chỉ chuẩn bị công cụ, không kiểm tra lại Cloud. Xem [runner và kế hoạch cleanup](../docs/reports/T10-C1-A-RUNNER.md).
+
+`npm.cmd run test:t10-assets` tái tạo PNG/WebP tổng hợp và decode bằng Edge/Playwright có sẵn, chặn mạng; không cần env thật. `npm.cmd run test:t10-cloud -- --smoke` là lệnh **Cloud cần review riêng**, mặc định không ghi nghiệp vụ. Dùng env Auth/A-B T06 trong `.env.auth.local`, native CLI3.1.0 và exact TheOU-dev; không tạo user.
+
+`--draft-write` yêu cầu riêng `THEOU_ALLOW_T10_DRAFT_WRITES=theou-dev`: một DRAFT/hai ảnh; dừng AWAITING_PUBLISH_REVIEW. `--publish-write <runId>` chỉ nhận inventory DRAFT đã verified, cần `THEOU_ALLOW_T10_PUBLISH_WRITES=theou-dev` và quyết định retention riêng (`THEOU_T10_RETAIN_PUBLISHED_FIXTURE=approved`); nếu chưa duyệt giữ bài thì BLOCKED. Hai mode ghi cần Node-only `THEOU_TEST_SECRET_KEY` để GET info/download đúng object, không gọi business API bằng secret.
+
+Artifacts `.temp/t10-media/<runId>.*` chứa inventory, journal INTENT/ACK/VERIFIED, SELECT verification và cleanup-plan.md; không signed URLs/tokens/password/JWT. Không có automatic cleanup, Storage DELETE, deletePost, SQL ghi hoặc mode replay. UNCERTAIN/I/O/timeout giữ journal/lock, dừng để review exact scope; không xóa lock/journal để chạy lại. Không dùng flags T06/T08/T09 mở quyền ghi T10. T10 chưa COMPLETED; không chạy Cloud trong C.1-A.
