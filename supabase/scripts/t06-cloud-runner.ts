@@ -57,7 +57,21 @@ export function publicPost(value: unknown): PostPublic {
       Number.isSafeInteger(value.upvoteCount) && Number(value.upvoteCount) >= 0 &&
       Number.isSafeInteger(value.commentCount) && Number(value.commentCount) >= 0 &&
       typeof value.isMine === 'boolean' && typeof value.hasUpvoted === 'boolean' &&
-      Array.isArray(value.images) && !value.images.length,
+      Array.isArray(value.images) && value.images.length <= 2 && value.images.every((image) => {
+        if (
+          !keys(image, ['id', 'signedUrl', 'expiresAt']) || typeof image.id !== 'string' ||
+          !uuidPattern.test(image.id) || typeof image.signedUrl !== 'string' || !timestamp(image.expiresAt)
+        ) return false
+        try {
+          const url = new URL(image.signedUrl)
+          return url.protocol === 'https:' && !url.username && !url.password && !url.hash &&
+            new RegExp(`^/storage/v1/object/sign/post-media/posts/${value.id}/${image.id}\\.(jpg|png|webp)$`)
+              .test(url.pathname) &&
+            !!url.searchParams.get('token') && [...url.searchParams.keys()].join() === 'token'
+        } catch {
+          return false
+        }
+      }),
     'POST_DTO_ALLOWLIST',
   )
   check(

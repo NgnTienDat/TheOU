@@ -7,6 +7,9 @@
 .temp/t06-cloud/
 # Inventory và SQL Comments T08 chỉ local, không tự cleanup.
 .temp/t08-comments/
+# Inventory/journal/verification/media T10 chỉ local; không tự cleanup.
+.temp/t10-media/
+.temp/t10-media-assets/
 
 # dotenvx
 .env.keys

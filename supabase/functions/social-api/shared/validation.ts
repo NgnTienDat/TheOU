@@ -2,9 +2,11 @@ import { ApiError } from './response.ts'
 import { type PostRequest, validatePostRequest } from '../modules/posts/post-validation.ts'
 import { type CommentRequest, validateCommentRequest } from '../modules/comments/comment-validation.ts'
 import { type UpvoteInput, validateUpvote } from '../modules/votes/vote-validation.ts'
+import { type MediaRequest, validateMedia } from '../modules/media/media-validation.ts'
 
 export type SocialRequest =
   | PostRequest
+  | MediaRequest
   | CommentRequest
   | { action: 'toggleUpvote'; payload: UpvoteInput }
   | { action: 'getMe'; payload: Record<string, never> }
@@ -74,6 +76,10 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
   if (body.action === 'toggleUpvote') {
     return { action: 'toggleUpvote', payload: validateUpvote(body.payload) }
   }
+  if (
+    typeof body.action === 'string' &&
+    ['createImageUpload', 'finalizeImage', 'removeDraftImage'].includes(body.action)
+  ) return validateMedia(body.action, body.payload)
   if (
     body.action === 'updateNickname' && Object.keys(body.payload).length === 1 && 'nickname' in body.payload
   ) {

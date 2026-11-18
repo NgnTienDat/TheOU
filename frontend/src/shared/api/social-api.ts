@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CommentPublic, Me, Page, PostPublic, SocialApiClient, UpvoteState } from './SocialApiClient.ts'
+import type { CommentPublic, ImageUpload, Me, Page, PostPublic, PublicImage, SocialApiClient, UpvoteState } from './SocialApiClient.ts'
 
-export type ClientErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_ERROR'
+export type ClientErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_ERROR' | 'UPLOAD_ERROR'
 const messages = {
+  UPLOAD_ERROR: 'Chưa thể xác nhận hoặc tải ảnh. Vui lòng thử lại hoặc gỡ ảnh khỏi bản nháp.',
   UNAUTHENTICATED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
   FORBIDDEN: 'Tài khoản không đủ điều kiện truy cập TheOU hoặc đã bị khóa.',
   VALIDATION_ERROR: 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra và thử lại.',
@@ -20,9 +21,20 @@ function object(value: unknown): value is Record<string, unknown> {
 function keys(value: Record<string, unknown>, names: string[]) {
   return Object.keys(value).sort().join(',') === names.sort().join(',')
 }
-type Action = Exclude<keyof SocialApiClient, 'setUpvote'> | 'toggleUpvote'
-type Data = Me | { nickname: string } | PostPublic | CommentPublic | Page<PostPublic> | Page<CommentPublic> | UpvoteState | { success: true } | { postId: string; status: 'DRAFT' }
+type Action = Exclude<keyof SocialApiClient, 'setUpvote' | 'uploadImage'> | 'toggleUpvote'
+type Data = Me | ImageUpload | {imageId:string;status:'READY'} | { nickname: string } | PostPublic | CommentPublic | Page<PostPublic> | Page<CommentPublic> | UpvoteState | { success: true } | { postId: string; status: 'DRAFT' }
 const uuid = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
+function parseImage(value: unknown, postId: string): PublicImage {
+  if (!object(value) || !keys(value,['id','signedUrl','expiresAt']) || typeof value.id !== 'string' || !uuid.test(value.id) ||
+    typeof value.signedUrl !== 'string' || typeof value.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value.expiresAt) || !Number.isFinite(Date.parse(value.expiresAt))) throw new SocialApiError('INTERNAL_ERROR')
+  try {
+    const url = new URL(value.signedUrl)
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash ||
+      url.pathname !== `/storage/v1/object/sign/post-media/posts/${postId}/${value.id}.${url.pathname.split('.').at(-1)}` ||
+      !/\.(jpg|png|webp)$/.test(url.pathname) || !url.searchParams.get('token') || [...url.searchParams.keys()].join() !== 'token') throw new Error()
+  } catch { throw new SocialApiError('INTERNAL_ERROR') }
+  return {id:value.id,signedUrl:value.signedUrl,expiresAt:value.expiresAt}
+}
 function parseComment(value: unknown): CommentPublic {
   if (!object(value) || !keys(value, ['id','postId','body','authorLabel','isOriginalPoster','isMine','createdAt']) ||
     typeof value.id !== 'string' || !uuid.test(value.id) || typeof value.postId !== 'string' || !uuid.test(value.postId) ||
@@ -41,7 +53,7 @@ function parsePost(value: unknown): PostPublic {
     typeof value.publishedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value.publishedAt) ||
     !Number.isFinite(Date.parse(value.publishedAt)) || !Number.isSafeInteger(value.upvoteCount) || Number(value.upvoteCount) < 0 ||
     !Number.isSafeInteger(value.commentCount) || Number(value.commentCount) < 0 ||
-    typeof value.hasUpvoted !== 'boolean' || typeof value.isMine !== 'boolean' || !Array.isArray(value.images) || value.images.length !== 0) throw new SocialApiError('INTERNAL_ERROR')
+    typeof value.hasUpvoted !== 'boolean' || typeof value.isMine !== 'boolean' || !Array.isArray(value.images) || value.images.length > 2) throw new SocialApiError('INTERNAL_ERROR')
   if (value.contactUrl !== null) {
     try {
       if (typeof value.contactUrl !== 'string' || value.contactUrl.length > 2048 || /[\s\p{Cc}]/u.test(value.contactUrl) ||
@@ -51,9 +63,10 @@ function parsePost(value: unknown): PostPublic {
         !['zalo.me','facebook.com','www.facebook.com','m.facebook.com','m.me'].includes(url.hostname)) throw new Error()
     } catch { throw new SocialApiError('INTERNAL_ERROR') }
   }
+  if(new Set(value.images.map(image => object(image)?image.id:undefined)).size!==value.images.length)throw new SocialApiError('INTERNAL_ERROR')
   return { id: value.id, tag: value.tag as PostPublic['tag'], body: value.body, displayMode: value.displayMode as PostPublic['displayMode'],
     authorLabel: value.authorLabel, contactUrl: value.contactUrl as string | null, publishedAt: value.publishedAt,
-    upvoteCount: value.upvoteCount as number, commentCount: value.commentCount as number, hasUpvoted: value.hasUpvoted, isMine: value.isMine, images: [] }
+    upvoteCount: value.upvoteCount as number, commentCount: value.commentCount as number, hasUpvoted: value.hasUpvoted, isMine: value.isMine, images: value.images.map(image => parseImage(image,value.id as string)) }
 }
 export function parseSocialResponse(body: unknown, status: number, action: Action): Data {
   if (status === 401) throw new SocialApiError('UNAUTHENTICATED')
@@ -64,18 +77,28 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
     !keys(body.meta, ['requestId']) || typeof body.meta.requestId !== 'string' ||
     !/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(body.meta.requestId)) throw new SocialApiError('INTERNAL_ERROR')
   if (body.error !== null) {
+    if (status === 422 && object(body.error) && body.error.code === 'UPLOAD_ERROR') throw new SocialApiError('UPLOAD_ERROR')
     if (status === 400 && object(body.error) && body.error.code === 'VALIDATION_ERROR') throw new SocialApiError('VALIDATION_ERROR')
     throw new SocialApiError('INTERNAL_ERROR')
   }
   const data = body.data
   if (status !== 200) throw new SocialApiError('INTERNAL_ERROR')
+  if (action === 'createImageUpload') {
+    if (!object(data) || !keys(data,['imageId','path','token']) || typeof data.imageId !== 'string' || !uuid.test(data.imageId) ||
+      typeof data.path !== 'string' || !new RegExp(`^posts/[\\da-f-]{36}/${data.imageId}\\.(jpg|png|webp)$`).test(data.path) || typeof data.token !== 'string' || !data.token || data.token.length > 8192) throw new SocialApiError('INTERNAL_ERROR')
+    return {imageId:data.imageId,path:data.path,token:data.token}
+  }
+  if (action === 'finalizeImage') {
+    if (!object(data) || !keys(data,['imageId','status']) || typeof data.imageId !== 'string' || !uuid.test(data.imageId) || data.status !== 'READY') throw new SocialApiError('INTERNAL_ERROR')
+    return {imageId:data.imageId,status:'READY'}
+  }
   if (action === 'toggleUpvote') {
     if (!object(data) || !keys(data, ['hasUpvoted','upvoteCount']) || typeof data.hasUpvoted !== 'boolean' ||
       !Number.isSafeInteger(data.upvoteCount) || Number(data.upvoteCount) < 0) throw new SocialApiError('INTERNAL_ERROR')
     return { hasUpvoted: data.hasUpvoted, upvoteCount: data.upvoteCount as number }
   }
   if (action === 'createComment') return parseComment(data)
-  if (action === 'deleteComment') {
+  if (action === 'deleteComment' || action === 'removeDraftImage') {
     if (!object(data) || !keys(data,['success']) || data.success !== true) throw new SocialApiError('INTERNAL_ERROR')
     return { success: true }
   }
@@ -108,6 +131,7 @@ export function createSocialApi(client: SupabaseClient, accessToken?: string): S
         ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       })
       if (error) {
+        if (response?.status === 422) throw new SocialApiError('UPLOAD_ERROR')
         if (response?.status === 401) throw new SocialApiError('UNAUTHENTICATED')
         if (response?.status === 403) throw new SocialApiError('FORBIDDEN')
         if (response?.status === 400) throw new SocialApiError('VALIDATION_ERROR')
@@ -119,6 +143,28 @@ export function createSocialApi(client: SupabaseClient, accessToken?: string): S
     } catch (error) { throw error instanceof SocialApiError ? error : new SocialApiError('INTERNAL_ERROR') }
   }
   return {
+    createImageUpload: async input => {
+      const upload = await invoke('createImageUpload',input) as ImageUpload
+      if (!upload.path.startsWith(`posts/${input.postId}/`) || !upload.path.endsWith(`.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'} as Record<string,string>)[input.mimeType]}`)) throw new SocialApiError('INTERNAL_ERROR')
+      return upload
+    },
+    uploadImage: async (upload,file) => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        const r = await Promise.race([
+          client.storage.from('post-media').uploadToSignedUrl(upload.path,upload.token,file,{contentType:file.type,cacheControl:'300',upsert:false}),
+          new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new SocialApiError('UPLOAD_ERROR')),30000)}),
+        ])
+        if (r.error) throw new SocialApiError('UPLOAD_ERROR')
+      } catch { throw new SocialApiError('UPLOAD_ERROR') }
+      finally {clearTimeout(timer)}
+    },
+    finalizeImage: async (postId,imageId) => {
+      const r = await invoke('finalizeImage',{postId,imageId}) as {imageId:string;status:'READY'}
+      if (r.imageId !== imageId) throw new SocialApiError('INTERNAL_ERROR')
+      return r
+    },
+    removeDraftImage: async (postId,imageId) => await invoke('removeDraftImage',{postId,imageId}) as {success:true},
     setUpvote: async (postId, desiredState) => {
       if (!uuid.test(postId) || typeof desiredState !== 'boolean') throw new SocialApiError('VALIDATION_ERROR')
       return await invoke('toggleUpvote', { postId, desiredState }) as UpvoteState

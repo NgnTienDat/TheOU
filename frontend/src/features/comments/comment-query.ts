@@ -1,11 +1,12 @@
 import { CancelledError, infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { CommentPublic, Page, SocialApiClient } from '../../shared/api/SocialApiClient.ts'
+import { readPost } from '../posts/post-read.ts'
 
 export const commentsKey = (scope: number, postId: string) => ['comments', scope, postId] as const
 export const detailKey = (scope: number, postId: string) => ['post', scope, postId] as const
 export function detailOptions(api: Pick<SocialApiClient,'getPost'>, scope: number, postId: string, isCurrent: () => boolean, reject: (error: unknown) => void) {
-  return queryOptions({ queryKey: detailKey(scope,postId), retry: false, queryFn: async ({ signal }) => {
-    try { const post = await api.getPost(postId); if (signal.aborted || !isCurrent()) throw new CancelledError(); return post }
+  return queryOptions({ queryKey: detailKey(scope,postId), retry: false, refetchOnWindowFocus: false, queryFn: async ({ signal }) => {
+    try { const post = await readPost(api,postId); if (signal.aborted || !isCurrent()) throw new CancelledError(); return post }
     catch (error) { if (signal.aborted || !isCurrent()) throw new CancelledError(); reject(error); throw error }
   } })
 }

@@ -152,7 +152,7 @@ T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi
 | OTP | Disable gửi trong lúc xử lý | — | Lỗi rõ nguyên nhân ở mức an toàn |
 | Đăng ký/đăng nhập | Disable submit trong lúc xử lý | — | Lỗi trường nhập hoặc thông báo Auth an toàn |
 | Viết bài | Loading trên nút Đăng | — | Giữ nội dung đang soạn |
-| Ảnh | Placeholder | Không ảnh | Ảnh lỗi + tùy chọn thử lại |
+| Ảnh | Placeholder | Không ảnh | Tự refresh URL có giới hạn, sau đó placeholder; không nút tải lại ngoài gallery |
 | Admin | Skeleton danh sách | Chưa có báo cáo | Không thể tải thông tin |
 
 ## 9. Nội dung và giới hạn ngôn ngữ
@@ -164,6 +164,14 @@ T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi
 - Ẩn danh với **cộng đồng**, không phải miễn trách nhiệm với ban quản trị hệ thống.
 
 ## 10. Kiểm thử nhanh trên thiết bị
+
+T10-A bổ sung ảnh vào UI V2, giữ Auth/Feed/Detail/Comments/Upvote. Composer có picker JPG/PNG/WebP dưới textarea, tối đa2 preview, gỡ và trạng thái xử lý/upload/xác minh/READY/lỗi. Không giữ tên file gốc; xử lý browser giới hạn input16MiB/40MP/cạnh16384, resize cạnh dài2048 rồi reencode về ≤2MiB. Không fallback upload ảnh gốc khi xử lý lỗi, không editor/drag-drop. Tiến trình là theo giai đoạn, không phần trăm byte giả. Sau publish bắt đầu khóa danh sách ảnh để retry an toàn; trước đó có thể gỡ/thay khi không đang gửi.
+
+T10-UI-R1 thay gallery T10-A bằng carousel dùng chung Feed/Detail: một ảnh lớn mỗi lượt, mặc định position1; hai ảnh có counter1/2, nút trước/sau44px, ArrowLeft/Right/Home/End và swipe ngang. `touch-action:pan-y pinch-zoom` giữ cuộn dọc/zoom; đổi slide tức thì, không animation bắt buộc. Ảnh giữ aspect ratio, contain/max-height min(540px,70dvh), không crop. Bài có ảnh theo thứ tự header→text→gallery→actions→tag/Bài của bạn/contact; bài text-only giữ bố cục cũ. Click ảnh Feed mở Detail bằng Link thật; Detail không self-link, controls/swipe không điều hướng.
+
+Bỏ nút Tải lại ảnh. `expiresAt`, timer expiry/onError và placeholder vẫn có; refetch PostPublic qua getPost tự động tối đa3lần/mount cho toàn gallery, gộp request đang chờ và chờ300ms trước mỗi lần. Đổi slide/URL không reset ngân sách; ảnh/URL vẫn lỗi sau giới hạn giữ placeholder trong khung. Auth scope/unmount bỏ late response, không tự ký URL, không render raw URL/path/error hoặc nút reload khác. Refresh trang/điều hướng lại cho lượt mount mới. Giữ selected-text, mobile fixed comment composer, dark/light/Theme/Auth, DTO/privacy và preview URL cleanup. T10-UI-R1 là local refinement chờ review; chưa chứng minh iOS/Android/keyboard/screen reader thật.
+
+T10-UI-R2: chủ dự án xác nhận carousel R1 Cloud6/6; sửa local focus/loading, chưa nghiệm thu toàn T10. Detail tắt focus refetch như Feed, giữ mount/reconnect/invalidation/manual refresh hiện hành và staleTime mặc định. Chuyển tab dưới TTL không xin URL; hidden không refresh, foreground chỉ kiểm tra expiry/lỗi. Một timer cho gallery; request cùng post/client phiên được gộp và dùng response query Detail/Feed đang chạy. Frame key chỉ theo image ID, giữ ảnh đã decode trong khi chuẩn bị URL mới; không thay ảnh còn hiển thị bằng placeholder chỉ vì expiry. Không ghi counts từ refresh ảnh. Sau budget3, ảnh chưa tải được giữ placeholder; ảnh đã decode có thể tiếp tục hiển thị. Xem [T10-UI-R2](reports/T10-UI-R2-IMAGE-FOCUS-REFETCH.md); visibility browser còn cần review thật ngoài mô phỏng headless.
 
 - Rộng 360/390/768/1280 px; Chrome Android và Safari iOS nếu có máy.
 - Bàn phím mở không che nút OTP/Đăng; tag cuộn ngang không phá layout.

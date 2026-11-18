@@ -202,6 +202,16 @@ Post text không ảnh cũng qua `DRAFT → PUBLISHED`. Retry `createPost` phả
 - **Giám sát:** lỗi OTP/upload/Edge Function, số request thất bại; kiểm tra ngân sách Storage/email và chi phí egress.
 - **Thời gian:** DB UTC, UI theo giờ địa phương VN.
 
+### Bổ sung local T10-A — Private media
+
+`modules/media/` gồm validation, service vòng đời và Storage adapter; handler dùng guard hiện có. Dùng lại post_images T02, trigger migration T10 tuần tự hóa metadata với publish. Không public RPC/bảng mới/dependency mới. Server client đặc quyền chỉ dùng sau xác thực/authorization. Bucket setup được bàn giao qua Dashboard/Storage API ở T10-B, không tự cấu hình trong request ứng dụng.
+
+Pipeline React: xử lý Blob bằng browser API → createPost canonical key → reserve PENDING → signed upload → verify/finalize READY → publish → Feed. External submission store giữ processed Blob, preview, position, progress, upload ACK và postId trong bộ nhớ; không lưu token/draft vào persistent storage. Retry finalize trước upload để giải quyết lost ACK; không ghi đè object. Gỡ ảnh chuyển REMOVING→Storage exact remove→REMOVED; token cũ không phục hồi metadata. Sau bắt đầu publish khóa cả attachments để giữ request khi chưa rõ commit.
+
+Post mapper chọn metadata ảnh nội bộ, kiểm tra PUBLISHED rồi ký read URL300giây theo position; DTO chỉ PublicImage, không serialize raw row. T10-UI-R1 dùng chung PostImages carousel cho Feed/Detail; bỏ nút reload, tự gọi getPost qua adapter khi ảnh lỗi/expiry, tối đa3lần/mount và gộp request pending. URL hoặc slide đổi không reset budget. Chỉ đổi images tại component, giữ nguyên optimistic vote/cache; Auth scope/unmount loại response cũ. Text-only không phụ thuộc Storage. SDK upload timeout30giây không chứng minh request đã bị hủy; SQL transactions không kéo dài qua network calls. Chi tiết lịch sử ở [T10-A](reports/T10-A-IMPLEMENTATION.md), refinement ở [T10-UI-R1](reports/T10-UI-R1.md).
+
+T10-UI-R2 dùng `post-read.ts` chia sẻ getPost in-flight theo API client gắn Auth scope + postId; không cache signed URL toàn cục hoặc ghi PostPublic vào query từ gallery. Khi Detail/Feed liên quan đang fetch, refresh ảnh chờ response đó trước khi xin thêm. Guard generation không nhận ảnh cũ sau props mới; unmount/scope bỏ callbacks cũ. Detail tắt riêng focus refetch, không đổi QueryClient global hoặc mutation invalidation. Một timer/gallery cùng foreground check kiểm tra expiry; hidden không mở retry. ImageFrame giữ DOM/key image ID và ảnh đã decode khi preload/decode URL mới, không dùng URL làm key. API đang gửi có thể hoàn tất sau dispose nhưng không cập nhật phiên mới. Xem [báo cáo R2](reports/T10-UI-R2-IMAGE-FOCUS-REFETCH.md).
+
 ## 10. Chiến lược viết backend riêng sau này
 
 1. Giữ `SocialApiClient` interface và DTO ổn định.

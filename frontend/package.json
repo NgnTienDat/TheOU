@@ -13,6 +13,7 @@
     "test:ui:feed": "node scripts/feed-ui-check.mjs",
     "test:ui:comments": "node scripts/comments-ui-check.mjs",
     "test:ui:votes": "node scripts/votes-ui-check.mjs",
+    "test:ui:media": "node scripts/media-ui-check.mjs",
     "preview": "vite preview"
   },
   "engines": {

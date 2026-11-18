@@ -86,7 +86,7 @@
 - Ảnh lưu trong bucket `post-media` **private**, mỗi bài tối đa hai ảnh.
 - Người dùng OU đã xác thực mới lấy được signed URL ngắn hạn khi xem bài.
 - Đường dẫn ảnh không chứa email/MSSV/user ID; ảnh client được tối ưu và loại bỏ EXIF nếu công cụ hỗ trợ.
-- Ảnh lỗi không làm sập feed; có placeholder và nút thử lại.
+- Ảnh lỗi không làm sập feed; gallery tự xin URL mới có giới hạn, sau đó hiện placeholder tối giản. T10-UI-R1 bỏ nút tải lại ảnh; refresh trang/điều hướng lại có thể bắt đầu lượt fetch mới.
 
 ## Nhóm F — Quản trị và an toàn
 

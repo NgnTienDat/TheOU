@@ -6,6 +6,8 @@ export interface PublicImage {
   signedUrl: string
   expiresAt: string
 }
+export interface ImageUploadInput { postId: string; mimeType: string; sizeBytes: number; position: number }
+export interface ImageUpload { imageId: string; path: string; token: string }
 
 export interface PostPublic {
   id: string
@@ -63,6 +65,10 @@ export interface UpvoteState { hasUpvoted: boolean; upvoteCount: number }
 
 // API nghiệp vụ qua Edge Function; không truy cập bảng trực tiếp.
 export interface SocialApiClient {
+  createImageUpload(input: ImageUploadInput): Promise<ImageUpload>
+  uploadImage(upload: ImageUpload, file: Blob): Promise<void>
+  finalizeImage(postId: string, imageId: string): Promise<{ imageId: string; status: 'READY' }>
+  removeDraftImage(postId: string, imageId: string): Promise<{ success: true }>
   getMe(): Promise<Me>
   updateNickname(nickname: string): Promise<{ nickname: string }>
   listPosts(input: ListPostsInput): Promise<Page<PostPublic>>
