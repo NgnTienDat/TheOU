@@ -264,7 +264,7 @@ test('T06 HTTP handler + SDK + PostgreSQL tạm — không phải Supabase Cloud
     }
     for(const body of ['{',' '.repeat(16385),JSON.stringify({action:'getMe',payload:{},role:'ADMIN'})])
       await failure(await f.handler(new Request('https://offline.example.invalid',{method:'POST',headers:{'content-type':'application/json'},body})),400,'VALIDATION_ERROR')
-    await failure(await invoke('deletePost',{postId:randomUUID()}),400,'VALIDATION_ERROR')
+    await failure(await invoke('deletePost',{postId:randomUUID()}),404,'NOT_FOUND')
   })
 })
 

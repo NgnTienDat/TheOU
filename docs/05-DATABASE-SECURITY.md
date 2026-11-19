@@ -223,3 +223,13 @@ Remove retry giữ REMOVING khi Storage lỗi và cấm publish; exact path dele
 - Với tài liệu nhạy cảm liên quan nhà trường, ưu tiên chỉ cho phép liên kết hoặc trao đổi sách vật lý hợp pháp, không host file lậu.
 
 **Nguồn kỹ thuật:** https://supabase.com/docs/guides/database/postgres/row-level-security · https://supabase.com/docs/guides/functions/auth · https://supabase.com/docs/guides/storage/buckets/fundamentals · https://supabase.com/docs/guides/storage/security/signing-keys
+
+## T11-A local — lifecycle và atomic audit
+
+Migration `20261118092925_t11_soft_delete_moderation.sql` thêm guard lifecycle posts: DRAFT chỉ publish; PUBLISHED có thể HIDDEN/DELETED; HIDDEN và DELETED không phục hồi/chuyển trạng thái trong T11. Owner delete chỉ PUBLISHED→DELETED, kiểm tra ACTIVE lại trong DB, replay DELETED không ghi row. Không hard-delete references, không xóa Storage hoặc reset counts. T08 đã cho phép VISIBLE→HIDDEN và tính delta theo VISIBLE nên không cần sửa trigger comments.
+
+RPC public `t11_admin_hide_content(p_admin_id uuid,p_target_type text,p_target_id uuid,p_reason text)` chỉ service_role EXECUTE, REVOKE PUBLIC/anon/authenticated/supabase_auth_admin; SECURITY INVOKER với search_path rỗng. Schema public là cầu nối PostgREST cho Edge, không phải API browser được phép dùng. Edge xác minh Auth/OU/confirmed/ACTIVE và đọc ADMIN từ user_roles trước khi truyền trusted admin ID. DB khóa share profile ACTIVE và role ADMIN, recheck transition, UPDATE POST PUBLISHED→HIDDEN hoặc COMMENT VISIBLE→HIDDEN rồi INSERT moderation_actions; cùng transaction, lỗi bất kỳ rollback toàn bộ. Replay HIDDEN trả CONFLICT, không audit giả/duplicate. COMMENT khóa child rồi trigger cập nhật parent theo thứ tự T08.
+
+Giữ grants/RLS deny direct clients của T02 và quyền service_role SELECT/INSERT audit hiện có, không mở UPDATE/DELETE. Trigger immutable bổ sung chặn sửa/xóa audit kể cả khi quyền vô tình được mở; không coi trigger này là chống superuser có thể thay DDL/TRUNCATE. Audit reason nội bộ, không đưa vào DTO. Catalog checker nay chỉ cho đúng signature RPC T11 với INVOKER/empty search_path và execute restrictions, vẫn từ chối RPC/view ngoài allowlist và các drift về grants/security/path đã kiểm thử.
+
+HIDDEN/DELETED posts không được public reads/interactions; recheck khi ký/trả ảnh giảm race trong request đang chạy nhưng signed URLs đã phát hành vẫn có TTL/cache. Không xóa metadata/object hoặc gọi public URL fallback. Concurrency/rollback PGlite là local coverage, chưa chứng minh locking PostgreSQL Cloud nhiều connection. Audit FK admin_id→auth.users RESTRICT: kế hoạch fixture phải giữ tài khoản có audit, không xóa log để xóa account.

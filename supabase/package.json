@@ -16,6 +16,7 @@
     "test:t08-cloud": "node --env-file=.env.auth.local scripts/t08-cloud.ts",
     "test:t09-cloud": "node --env-file=.env.auth.local scripts/t09-cloud.ts",
     "test:t10-cloud": "node --env-file=.env.auth.local scripts/t10-cloud.ts",
+    "test:t11-cloud": "node --env-file=.env.auth.local scripts/t11-cloud.ts",
     "test:t10-assets": "node scripts/t10-media-assets-check.mjs",
     "auth:manual": "node --env-file=.env.auth.local scripts/auth-manual.ts"
   },

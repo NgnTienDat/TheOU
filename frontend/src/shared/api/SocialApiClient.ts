@@ -65,6 +65,8 @@ export interface UpvoteState { hasUpvoted: boolean; upvoteCount: number }
 
 // API nghiệp vụ qua Edge Function; không truy cập bảng trực tiếp.
 export interface SocialApiClient {
+  deletePost(postId: string): Promise<{ success: true }>
+  adminHideContent(input: { targetType: 'POST' | 'COMMENT'; targetId: string; reason: string }): Promise<{ success: true }>
   createImageUpload(input: ImageUploadInput): Promise<ImageUpload>
   uploadImage(upload: ImageUpload, file: Blob): Promise<void>
   finalizeImage(postId: string, imageId: string): Promise<{ imageId: string; status: 'READY' }>

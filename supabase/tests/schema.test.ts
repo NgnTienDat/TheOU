@@ -53,7 +53,7 @@ test('migration trên PostgreSQL tạm — không phải Supabase Cloud', async 
     })
   }
 
-  await t.test('9 bảng bật ENABLE/FORCE RLS, không có public view hoặc RPC', async () => {
+  await t.test('9 bảng ENABLE/FORCE RLS, không public view; chỉ RPC T11 đã khóa client', async () => {
     await db.exec(await readFile(new URL('./catalog-check.sql', import.meta.url), 'utf8'))
     const { rows } = await db.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
       `select relname, relrowsecurity, relforcerowsecurity from pg_class
@@ -61,7 +61,7 @@ test('migration trên PostgreSQL tạm — không phải Supabase Cloud', async 
     assert.deepEqual(rows.map(r => r.relname), [...tables].sort())
     assert.ok(rows.every(r => r.relrowsecurity && r.relforcerowsecurity))
     assert.equal((await db.query(`select 1 from pg_class where relnamespace = 'public'::regnamespace and relkind in ('v', 'm')`)).rows.length, 0)
-    assert.equal((await db.query(`select 1 from pg_proc where pronamespace = 'public'::regnamespace`)).rows.length, 0)
+    assert.equal((await db.query(`select 1 from pg_proc where pronamespace = 'public'::regnamespace and proname <> 't11_admin_hide_content'`)).rows.length, 0)
     assert.equal((await db.query(`select 1 from pg_proc where pronamespace = 'theou_private'::regnamespace and prosecdef`)).rows.length, 0)
   })
 

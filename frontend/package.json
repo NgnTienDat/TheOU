@@ -14,6 +14,7 @@
     "test:ui:comments": "node scripts/comments-ui-check.mjs",
     "test:ui:votes": "node scripts/votes-ui-check.mjs",
     "test:ui:media": "node scripts/media-ui-check.mjs",
+    "test:ui:moderation": "node scripts/moderation-ui-check.mjs",
     "preview": "vite preview"
   },
   "engines": {

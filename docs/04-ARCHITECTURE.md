@@ -212,6 +212,14 @@ Post mapper chọn metadata ảnh nội bộ, kiểm tra PUBLISHED rồi ký rea
 
 T10-UI-R2 dùng `post-read.ts` chia sẻ getPost in-flight theo API client gắn Auth scope + postId; không cache signed URL toàn cục hoặc ghi PostPublic vào query từ gallery. Khi Detail/Feed liên quan đang fetch, refresh ảnh chờ response đó trước khi xin thêm. Guard generation không nhận ảnh cũ sau props mới; unmount/scope bỏ callbacks cũ. Detail tắt riêng focus refetch, không đổi QueryClient global hoặc mutation invalidation. Một timer/gallery cùng foreground check kiểm tra expiry; hidden không mở retry. ImageFrame giữ DOM/key image ID và ảnh đã decode khi preload/decode URL mới, không dùng URL làm key. API đang gửi có thể hoàn tất sau dispose nhưng không cập nhật phiên mới. Xem [báo cáo R2](reports/T10-UI-R2-IMAGE-FOCUS-REFETCH.md).
 
+## Bổ sung T11-A local — soft delete và moderation
+
+`modules/moderation/moderation.ts` validate/dispatch admin hide; posts service thêm owner delete bằng UPDATE có filter id/author_id/PUBLISHED. Migration T11 mới giữ lifecycle terminal; không sửa migrations cũ. Admin gọi duy nhất `public.t11_admin_hide_content(uuid,text,uuid,text)` qua server SDK RPC: SECURITY INVOKER/search_path rỗng, EXECUTE chỉ service_role. Public schema cần cho PostgREST, không expose theou_private hoặc cấp client quyền RPC. Function recheck ACTIVE và ADMIN có khóa share, UPDATE target có điều kiện rồi INSERT audit trong cùng transaction. Audit error rollback status và delta comment_count. T08 create/delete/count và T09 votes giữ nguyên implementation.
+
+Read mapping recheck PUBLISHED trước ký và trước trả PostPublic, bỏ rows vừa bị ẩn khi chờ Storage; getPost không còn row trả404. Không cam kết thu hồi URL đã phát hành hoặc tuyến tính hóa response với commit xảy ra sau lần recheck cuối. Frontend dùng adapter và runContentAction để ACK trước cache changes, chỉ invalidate đúng scope; owner delete và AdminPage dùng useTask/session/unmount guard. Không có Supabase raw-table/RPC trong UI. Chưa deploy hoặc kiểm chứng contention nhiều connection; T11-B cần review riêng.
+
+Test đã tái hiện listComments giữ snapshot VISIBLE khi admin hide commit trong lúc SELECT đang chờ. T11 bổ sung recheck VISIBLE theo IDs và recheck parent trước mapping/cursor, không sửa mutation/trigger T08. Nếu moderation loại hết một trang trong lúc đọc, trang có thể ngắn hoặc kết thúc sớm; refresh để đọc lại. Đây không phải snapshot consistency hoặc bảo đảm không có commit sau lần recheck cuối.
+
 ## 10. Chiến lược viết backend riêng sau này
 
 1. Giữ `SocialApiClient` interface và DTO ổn định.

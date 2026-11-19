@@ -239,6 +239,16 @@ Các phương thức còn lại tuân theo cùng mẫu. `createSocialApi` ánh x
 
 ## 8. Bảo mật bắt buộc ở mỗi action
 
+### T11-A local — deletePost và adminHideContent
+
+- `deletePost({postId})` strict payload/UUID; chỉ owner ACTIVE từ Auth Guard, không ADMIN bypass. UPDATE có filter owner/PUBLISHED; DELETED replay trả `{success:true}` không write; DRAFT/HIDDEN trả CONFLICT409. Missing/cross-owner cùng NOT_FOUND404. Chỉ status/updated_at đổi khi transition thật; giữ publish timestamp/body/identity/comments/votes/images. Không cleanup DRAFT/Storage và không restore.
+- `adminHideContent({targetType:'POST'|'COMMENT',targetId,reason})`: chỉ ADMIN đọc DB trên request đang xử lý, không tin metadata/payload role. Lý do trim1–500 Unicode code points, cấm Cc/Cf/Cs; không nhận field thừa. Non-admin request hợp lệ403; malformed/spoof fields400. RPC service-only recheck ACTIVE/ADMIN, thực hiện hide và audit HIDE trong một transaction. POST chỉ PUBLISHED→HIDDEN, COMMENT chỉ VISIBLE→HIDDEN (không cần public preview parent). Missing/wrong type target404; DRAFT/DELETED/already-HIDDEN409. Audit failure500 an toàn và rollback; success chỉ `{success:true}`, không reason/audit/identity trong response.
+- Sau POST HIDDEN/DELETED, getPost/listComments/createComment/toggleUpvote public chỉ thấy NOT_FOUND theo guards hiện có; listPosts NEW/HOT loại bỏ. Read mapping recheck trạng thái trước ký/trả; không trả URL mới cho request bắt đầu sau commit. Request đang chạy có cửa sổ sau recheck cuối; URL cũ TTL300giây/cache không được bảo đảm revoke tức thì. Không hard-delete post_images/objects. Comment HIDDEN không vào list/cursor, count chỉ VISIBLE qua trigger T08; owner deleteComment giữ semantics T08, không được xóa HIDDEN qua API.
+
+Đây là bản triển khai local T11-A, chưa Cloud acceptance. Các đoạn T06–T10 bên trên là lịch sử theo giai đoạn; không có createReport/adminListReports/adminResolveReport/adminSetUserStatus/RESTORE mới trong T11.
+
+listComments recheck VISIBLE và parent PUBLISHED trước mapping, không đưa row vừa bị ẩn vào DTO/cursor tại bước recheck. Moderation đồng thời có thể làm trang ngắn hoặc nextCursor=null sớm; refresh để đọc lại. Không có snapshot consistency và vẫn có cửa sổ commit sau lần kiểm tra cuối.
+
 T02 khóa mọi truy cập bảng trực tiếp và giữ ownership bất biến bằng trigger. T04–T07 đã nghiệm thu trong phạm vi tương ứng. T08-A chỉ local comments/OP/soft-delete chính chủ; T11 phụ trách deletePost và admin hide/audit, tái sử dụng lifecycle comments. Test CRUD service-role hoặc PGlite không thay thế JWT/PostgREST/locking Cloud thật. Lỗi SQL/constraint phải map sang message an toàn ở Edge/adapter.
 
 Pseudocode chung:

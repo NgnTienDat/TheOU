@@ -4,6 +4,8 @@ React + Vite + TypeScript, Tailwind CSS, React Router, TanStack Query và Supaba
 
 ## Chạy tại máy
 
+**T11-A local:** PostCard/Detail có Xóa bài viết chỉ cho isMine, xác nhận/pending/lỗi và chỉ cập nhật cache sau ACK. `/admin` nhận POST UUID/link cùng origin hoặc COMMENT UUID và lý do1–500 ký tự; chỉ form của getMe.isAdmin, API vẫn recheck ADMIN. Link ở Cá nhân của admin, giữ social nav ba mục V2. Không preview/report queue/ban/restore hoặc Storage delete. Chạy `npm.cmd run test:ui:moderation` cho mock390/1280 dark/light; toàn bộ mạng ngoài Vite/host giả bị chặn. Xem [T11-A](../docs/reports/T11-A-IMPLEMENTATION.md). Chưa Cloud acceptance hoặc deploy T11; lịch sử các lượt được giữ nguyên.
+
 Yêu cầu Node.js >= 22.18; CI dùng Node.js 24. Từ root repository:
 
 ```powershell
