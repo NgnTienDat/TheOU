@@ -28,7 +28,7 @@ export async function postFixture() {
   await db.query(`insert into public.profiles(id,nickname) values ($1,'Nickname A'),($2,'Nickname B')`, [a, b])
   await db.exec('set role service_role')
   const state = { now: Date.now(), authError: false, outsideOu: false, unconfirmed: false,
-    failTable: '', lostCreate: false, lostComment: false, lostDelete: false, secret: cursorSecret, beforePatch: null as null | (() => Promise<void>), beforeCommentInsert: null as null | (() => Promise<void>), beforeCommentPatch: null as null | (() => Promise<void>), afterCommentRead: null as null | (() => Promise<void>) }
+    failTable: '', lostCreate: false, lostComment: false, lostDelete: false, secret: cursorSecret, beforeModeration: null as null | (() => Promise<void>), beforePatch: null as null | (() => Promise<void>), beforeCommentInsert: null as null | (() => Promise<void>), beforeCommentPatch: null as null | (() => Promise<void>), afterCommentRead: null as null | (() => Promise<void>) }
   const votes = { beforeWrite: null as null | (() => Promise<void>), afterWrite: null as null | (() => Promise<void>), lost: false, malformed: false }
   const calls: { method: string; table: string; query: string }[] = []
   const storage = { objects:new Map<string,Blob>(), fail:'', lost:'', bucketPatch:{} as Record<string,unknown>, infoPatch:{} as Record<string,unknown>, calls:[] as {operation:string;path:string}[], before:null as null|(()=>Promise<void>) }
@@ -82,6 +82,13 @@ export async function postFixture() {
     if (init?.signal?.aborted) throw new DOMException('Offline timeout', 'AbortError')
     const data = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null
     try {
+      if (table === 'rpc/t11_admin_hide_content') {
+        assert.equal(method, 'POST')
+        assert.deepEqual(Object.keys(data!).sort(), ['p_admin_id','p_reason','p_target_id','p_target_type'])
+        if (state.beforeModeration) await state.beforeModeration()
+        await db.query('select public.t11_admin_hide_content($1,$2,$3,$4)', [data!.p_admin_id,data!.p_target_type,data!.p_target_id,data!.p_reason])
+        return new Response(null,{status:204})
+      }
       if(table==='post_images') {
         if(method==='POST') {
           assert.deepEqual(Object.keys(data!).sort(),['id','mime_type','position','post_id','size_bytes','storage_path'])
@@ -152,7 +159,8 @@ export async function postFixture() {
         }
         assert.equal(method, 'GET')
         const params: unknown[] = []; const where: string[] = []
-        for (const name of ['id','post_id','author_id','idempotency_key','status']) if (filter(url, name)) { params.push(filter(url, name)); where.push(`${name}=$${params.length}`) }
+        for (const name of ['id','post_id','author_id','idempotency_key','status']) if (filter(url, name) && !url.searchParams.get(name)?.startsWith('in.')) { params.push(filter(url, name)); where.push(`${name}=$${params.length}`) }
+        if (url.searchParams.get('id')?.startsWith('in.')) { params.push(url.searchParams.get('id')!.slice(4,-1).split(',')); where.push(`id=any($${params.length}::uuid[])`) }
         const upper = url.searchParams.get('created_at')
         if (upper) { assert.match(upper, /^lte\./); params.push(upper.slice(4)); where.push(`created_at<=$${params.length}::timestamptz`) }
         const or = url.searchParams.get('or')
@@ -164,7 +172,7 @@ export async function postFixture() {
         const order = url.searchParams.get('order'); if (order) assert.equal(order, 'created_at.asc,id.asc')
         const limit = url.searchParams.get('limit'); if (limit) assert.ok(Number(limit) >= 2 && Number(limit) <= 21)
         const select = url.searchParams.get('select')!
-        assert.ok(['id,post_id,author_id,body,status,created_at','id,post_id,status','status'].includes(select))
+        assert.ok(['id','id,post_id,author_id,body,status,created_at','id,post_id,status','status'].includes(select))
         const rows = (await db.query<Record<string,unknown>>(`select ${select.replace('created_at','created_at::text')} from comments ${where.length ? 'where '+where.join(' and ') : ''} ${order ? 'order by created_at asc,id asc' : ''} ${limit ? 'limit '+Number(limit) : ''}`, params)).rows
         if (state.afterCommentRead) { const hook = state.afterCommentRead; state.afterCommentRead = null; await hook() }
         return Response.json(rows.map(row => row.created_at ? { ...row, created_at: iso(row.created_at as string).replace(/Z$/, '+00:00') } : row))
@@ -192,6 +200,11 @@ export async function postFixture() {
         p.published_at::text,p.upvote_count,p.comment_count,
         coalesce((select jsonb_agg(jsonb_build_object('id',i.id,'post_id',i.post_id,'storage_path',i.storage_path,'mime_type',i.mime_type,'size_bytes',i.size_bytes,'position',i.position,'status',i.status)) from post_images i where i.post_id=p.id),'[]'::jsonb) as post_images`
       if (method === 'PATCH') {
+        if (data?.status === 'DELETED') {
+          assert.equal(filter(url,'status'),'PUBLISHED'); assert.ok(filter(url,'author_id')); assert.equal(url.searchParams.get('select'),'id')
+          if (state.beforePatch) await state.beforePatch()
+          return Response.json((await db.query("update posts set status='DELETED' where id=$1 and author_id=$2 and status='PUBLISHED' returning id",[filter(url,'id'),filter(url,'author_id')])).rows)
+        }
         assert.deepEqual(data, { status: 'PUBLISHED' })
         assert.equal(filter(url, 'status'), 'DRAFT')
         assert.ok(filter(url, 'author_id'))
@@ -206,7 +219,8 @@ export async function postFixture() {
       const params: unknown[] = []
       const where: string[] = []
       const add = (sql: string, value: unknown) => { params.push(value); where.push(sql.replace('?', `$${params.length}`)) }
-      for (const name of ['id','author_id','idempotency_key','status','tag']) if (filter(url, name)) add(`p.${name}=?`, filter(url, name))
+      for (const name of ['id','author_id','idempotency_key','status','tag']) if (filter(url, name) && !url.searchParams.get(name)?.startsWith('in.')) add(`p.${name}=?`, filter(url, name))
+      if (url.searchParams.get('id')?.startsWith('in.')) add('p.id=any(?::uuid[])',url.searchParams.get('id')!.slice(4,-1).split(','))
       for (const value of url.searchParams.getAll('published_at')) {
         assert.match(value, /^(lte|gte)\./)
         add(`p.published_at${value.startsWith('lte.') ? '<=' : '>='}?::timestamptz`, value.slice(4))
@@ -227,12 +241,12 @@ export async function postFixture() {
           : `(p.upvote_count,p.published_at,p.id)<($${offset+1}::integer,$${offset+2}::timestamptz,$${offset+3}::uuid)`)
       }
       const select = url.searchParams.get('select')
-      assert.ok(select === postColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id' || select === 'id,author_id,status')
+      assert.ok(select === 'id' || select === postColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id' || select === 'id,author_id,status')
       const order = url.searchParams.get('order')
       if (order) assert.ok(['published_at.desc,id.desc','upvote_count.desc,published_at.desc,id.desc'].includes(order))
       const limit = url.searchParams.get('limit')
       if (limit) assert.ok(Number.isInteger(Number(limit)) && Number(limit) >= 2 && Number(limit) <= 21)
-      const result = await db.query<Record<string,unknown>>(`select ${select === postColumns ? columns : select === 'id,author_id' ? 'p.id,p.author_id' : select === 'id,author_id,status' ? 'p.id,p.author_id,p.status' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
+      const result = await db.query<Record<string,unknown>>(`select ${select === 'id' ? 'p.id' : select === postColumns ? columns : select === 'id,author_id' ? 'p.id,p.author_id' : select === 'id,author_id,status' ? 'p.id,p.author_id,p.status' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
         ${where.length ? `where ${where.join(' and ')}` : ''}
         ${order ? `order by ${order.split(',').map(value => 'p.'+value.replace('.', ' ')).join(',')}` : ''} ${limit ? `limit ${Number(limit)}` : ''}`, params)
       return Response.json(result.rows.map(row => row.published_at ? { ...row, published_at: iso(row.published_at as string) } : row))
@@ -258,7 +272,7 @@ export async function postFixture() {
     async reset() {
       await db.exec(`reset role; truncate posts cascade; set role service_role; delete from user_roles;
         update profiles set status='ACTIVE',nickname=case when id='${a}' then 'Nickname A' else 'Nickname B' end;`)
-      Object.assign(state, { now: Date.now(), authError:false, outsideOu:false, unconfirmed:false, failTable:'', lostCreate:false, lostComment:false, lostDelete:false, secret:cursorSecret, beforePatch:null, beforeCommentInsert:null, beforeCommentPatch:null, afterCommentRead:null })
+      Object.assign(state, { now: Date.now(), authError:false, outsideOu:false, unconfirmed:false, failTable:'', lostCreate:false, lostComment:false, lostDelete:false, secret:cursorSecret, beforeModeration:null, beforePatch:null, beforeCommentInsert:null, beforeCommentPatch:null, afterCommentRead:null })
       calls.length = 0
       storage.objects.clear();storage.calls.length=0;Object.assign(storage,{fail:'',lost:'',before:null,bucketPatch:{},infoPatch:{}})
       Object.assign(votes, {beforeWrite:null,afterWrite:null,lost:false,malformed:false})

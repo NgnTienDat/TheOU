@@ -98,7 +98,7 @@ export function parseSocialResponse(body: unknown, status: number, action: Actio
     return { hasUpvoted: data.hasUpvoted, upvoteCount: data.upvoteCount as number }
   }
   if (action === 'createComment') return parseComment(data)
-  if (action === 'deleteComment' || action === 'removeDraftImage') {
+  if (action === 'deleteComment' || action === 'removeDraftImage' || action === 'deletePost' || action === 'adminHideContent') {
     if (!object(data) || !keys(data,['success']) || data.success !== true) throw new SocialApiError('INTERNAL_ERROR')
     return { success: true }
   }
@@ -143,6 +143,8 @@ export function createSocialApi(client: SupabaseClient, accessToken?: string): S
     } catch (error) { throw error instanceof SocialApiError ? error : new SocialApiError('INTERNAL_ERROR') }
   }
   return {
+    deletePost: async postId => await invoke('deletePost', { postId }) as { success: true },
+    adminHideContent: async input => await invoke('adminHideContent', input) as { success: true },
     createImageUpload: async input => {
       const upload = await invoke('createImageUpload',input) as ImageUpload
       if (!upload.path.startsWith(`posts/${input.postId}/`) || !upload.path.endsWith(`.${({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'} as Record<string,string>)[input.mimeType]}`)) throw new SocialApiError('INTERNAL_ERROR')

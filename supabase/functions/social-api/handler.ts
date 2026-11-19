@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getMe, getOrCreateProfile } from './modules/profile/get-me.ts'
 import { updateNickname } from './modules/profile/update-nickname.ts'
-import { createPost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
+import { createPost, deletePost, getPost, listPosts, publishPost } from './modules/posts/post-service.ts'
+import { adminHideContent } from './modules/moderation/moderation.ts'
 import { createComment, deleteComment, listComments } from './modules/comments/comment-service.ts'
 import { toggleUpvote } from './modules/votes/vote-service.ts'
 import { createImageUpload, finalizeImage, removeDraftImage } from './modules/media/media-service.ts'
@@ -56,6 +57,16 @@ export function createSocialApiHandler(deps: Dependencies) {
         profile,
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),
         now: deps.now?.() ?? Date.now(),
+      }
+      if (body.action === 'adminHideContent') {
+        return success(
+          await adminHideContent(admin, user.id, isAdmin, body.payload, ctx.signal),
+          requestId,
+          headers,
+        )
+      }
+      if (body.action === 'deletePost') {
+        return success(await deletePost(ctx, body.payload.postId), requestId, headers)
       }
       if (body.action === 'createImageUpload') {
         return success(await createImageUpload(ctx, body.payload), requestId, headers)

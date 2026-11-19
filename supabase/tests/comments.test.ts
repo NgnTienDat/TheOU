@@ -115,9 +115,9 @@ test('T08 comments HTTP + SDK + PGlite — không phải Cloud concurrency', asy
     f.state.now+=900001; await denied(await list(p,b,first.nextCursor),400,'VALIDATION_ERROR')
   })
   await t.test('parent đổi trạng thái khi đang đọc không trả comments; DB/Auth failure an toàn',async()=>{
-    const p=await f.seed(); await ok(await create(p)); f.state.afterCommentRead=async()=>{await f.db.query("update posts set status='HIDDEN' where id=$1",[p])}
+    let p=await f.seed(); await ok(await create(p)); f.state.afterCommentRead=async()=>{await f.db.query("update posts set status='HIDDEN' where id=$1",[p])}
     await denied(await list(p),404,'NOT_FOUND')
-    await f.db.query("update posts set status='PUBLISHED' where id=$1",[p])
+    p=await f.seed() // T11 không hỗ trợ restore HIDDEN; dùng parent mới để thử lỗi hạ tầng.
     for(const table of ['comments','posts']) { f.state.failTable=table; await denied(await list(p),500,'INTERNAL_ERROR') }; f.state.failTable=''
     f.state.authError=true; await denied(await list(p),500,'INTERNAL_ERROR')
   })

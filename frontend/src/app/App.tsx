@@ -10,6 +10,7 @@ import { AppFrame } from '../shared/components/AppFrame.tsx'
 import { FeedPage } from '../features/feed/FeedPage.tsx'
 import { CreatePostPage } from '../features/posts/CreatePostPage.tsx'
 import { PostDetailPage } from '../features/posts/PostDetailPage.tsx'
+import { AdminPage } from '../features/moderation/AdminPage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export function App() {
             </Route>
             <Route element={<AppFrame />}><Route element={<SessionGate protectedRoute />}>
               <Route path="/ca-nhan" element={<ProfilePage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/" element={<FeedPage />} />
               <Route path="/bai-viet/moi" element={<CreatePostPage />} />
               <Route path="/bai-viet/:id" element={<PostDetailPage />} />

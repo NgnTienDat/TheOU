@@ -14,19 +14,47 @@ interface Context {
   now?: number
 }
 async function publicPosts(ctx: Context, rows: PostRow[]): Promise<PostPublic[]> {
+  // Recheck trước ký và trước trả: hide trong lúc Storage chờ không được lộ URL mới.
+  const visible = async (ids: string[]) => {
+    const result = await ctx.client.from('posts').select('id').in('id', ids).eq('status', 'PUBLISHED')
+      .abortSignal(ctx.signal)
+    if (result.error || !Array.isArray(result.data)) throw new ApiError('INTERNAL_ERROR')
+    return new Set(result.data.map((row) => row.id))
+  }
+  if (!rows.length) return []
+  const before = await visible(rows.map((row) => row.id))
+  rows = rows.filter((row) => before.has(row.id))
   const posts = rows.map((row) => mapPost(row, ctx.userId, false))
   if (!posts.length) return []
   const { data, error } = await ctx.client.from('post_votes').select('post_id')
     .eq('user_id', ctx.userId).in('post_id', posts.map((post) => post.id)).abortSignal(ctx.signal)
   if (error || !Array.isArray(data)) throw new ApiError('INTERNAL_ERROR')
   const votes = new Set(data.map((row) => row.post_id))
-  return await Promise.all(
+  const result = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
       hasUpvoted: votes.has(post.id),
       images: await signedImages(ctx.client, rows[i], ctx.now ?? Date.now()),
     })),
   )
+  const after = await visible(result.map((post) => post.id))
+  return result.filter((post) => after.has(post.id))
+}
+
+export async function deletePost(ctx: Context, postId: string) {
+  const result = await ctx.client.from('posts').update({ status: 'DELETED' }).eq('id', postId)
+    .eq('author_id', ctx.userId).eq('status', 'PUBLISHED').select('id').abortSignal(ctx.signal).maybeSingle()
+  if (result.error) throw new ApiError(result.error.code === '42501' ? 'FORBIDDEN' : 'INTERNAL_ERROR')
+  if (!result.data) {
+    const replay = await ctx.client.from('posts').select('id,author_id,status').eq('id', postId).eq(
+      'author_id',
+      ctx.userId,
+    ).abortSignal(ctx.signal).maybeSingle()
+    if (replay.error) throw new ApiError('INTERNAL_ERROR')
+    if (!replay.data) throw new ApiError('NOT_FOUND')
+    if (replay.data.status !== 'DELETED') throw new ApiError('CONFLICT')
+  }
+  return { success: true as const }
 }
 
 export async function createPost(ctx: Context, input: CreatePostInput) {
@@ -81,7 +109,9 @@ export async function publishPost(ctx: Context, postId: string) {
     row = existing.data as PostRow
     if (row.status !== 'PUBLISHED') throw new ApiError('CONFLICT')
   }
-  return (await publicPosts(ctx, [row]))[0]
+  const post = (await publicPosts(ctx, [row]))[0]
+  if (!post) throw new ApiError('NOT_FOUND')
+  return post
 }
 
 export async function getPost(ctx: Context, postId: string) {
@@ -89,7 +119,9 @@ export async function getPost(ctx: Context, postId: string) {
     .eq('id', postId).eq('status', 'PUBLISHED').abortSignal(ctx.signal).maybeSingle()
   if (error) throw new ApiError('INTERNAL_ERROR')
   if (!data) throw new ApiError('NOT_FOUND')
-  return (await publicPosts(ctx, [data as PostRow]))[0]
+  const post = (await publicPosts(ctx, [data as PostRow]))[0]
+  if (!post) throw new ApiError('NOT_FOUND')
+  return post
 }
 
 export async function listPosts(ctx: Context, input: ListPostsInput, secret: string, now: number) {

@@ -3,11 +3,14 @@ import { type PostRequest, validatePostRequest } from '../modules/posts/post-val
 import { type CommentRequest, validateCommentRequest } from '../modules/comments/comment-validation.ts'
 import { type UpvoteInput, validateUpvote } from '../modules/votes/vote-validation.ts'
 import { type MediaRequest, validateMedia } from '../modules/media/media-validation.ts'
+import { type HideInput, validateHide } from '../modules/moderation/moderation.ts'
 
 export type SocialRequest =
   | PostRequest
   | MediaRequest
   | CommentRequest
+  | { action: 'adminHideContent'; payload: HideInput }
+  | { action: 'deletePost'; payload: { postId: string } }
   | { action: 'toggleUpvote'; payload: UpvoteInput }
   | { action: 'getMe'; payload: Record<string, never> }
   | {
@@ -75,6 +78,14 @@ export async function validateRequest(request: Request): Promise<SocialRequest> 
   }
   if (body.action === 'toggleUpvote') {
     return { action: 'toggleUpvote', payload: validateUpvote(body.payload) }
+  }
+  if (body.action === 'adminHideContent') {
+    return { action: 'adminHideContent', payload: validateHide(body.payload) }
+  }
+  if (body.action === 'deletePost') {
+    const parsed = validatePostRequest('getPost', body.payload)
+    if (parsed.action !== 'getPost') throw new ApiError('VALIDATION_ERROR')
+    return { action: 'deletePost', payload: parsed.payload }
   }
   if (
     typeof body.action === 'string' &&

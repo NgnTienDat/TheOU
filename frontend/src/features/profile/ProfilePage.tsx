@@ -1,5 +1,6 @@
 import { useTask } from '../auth/use-task.ts'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { Alert, Field, Submit } from '../auth/components.tsx'
 import { nicknameError } from '../auth/validation.ts'
@@ -23,6 +24,7 @@ export function ProfilePage() {
     <div className="profile-row"><span className="section-label">Biệt danh của bạn</span>{!editing && <button className="ghost" type="button" disabled={task.busy} onClick={() => { setEditing(true); setNickname(me.nickname); setSubmitted(false); task.setError('') }}>Chỉnh sửa</button>}</div>
     <div className="read-value wrap-anywhere">{me.nickname}</div>
     <div className="profile-caption">Biệt danh chỉ xuất hiện khi bạn chọn đăng bài công khai bằng biệt danh. Bài ẩn danh vẫn giữ riêng tư.</div>
+    {me.isAdmin && <p><Link className="ghost" to="/admin">Kiểm duyệt nội dung</Link></p>}
     {editing && <form className="profile-edit open" noValidate aria-busy={task.busy} onSubmit={task.submit(async () => {
       setSubmitted(true)
       if (validation) return

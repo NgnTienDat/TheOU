@@ -38,9 +38,16 @@ export async function listComments(ctx: Context, input: ListCommentsInput, secre
     ascending: true,
   }).limit(input.limit + 1).abortSignal(ctx.signal)
   if (error || !Array.isArray(data)) throw new ApiError('INTERNAL_ERROR')
-  // Kiểm tra lại parent sau truy vấn để không trả nội dung khi post vừa bị ẩn.
+  let rows = data.slice(0, input.limit) as CommentRow[]
+  // Admin hide có thể commit khi SELECT trước đang chờ; không đưa snapshot cũ vào DTO/cursor.
+  if (rows.length) {
+    const visible = await ctx.client.from('comments').select('id').in('id', rows.map((row) => row.id))
+      .eq('post_id', input.postId).eq('status', 'VISIBLE').abortSignal(ctx.signal)
+    if (visible.error || !Array.isArray(visible.data)) throw new ApiError('INTERNAL_ERROR')
+    const ids = new Set(visible.data.map((row) => row.id))
+    rows = rows.filter((row) => ids.has(row.id))
+  }
   const parent = await requirePost(ctx, input.postId)
-  const rows = data.slice(0, input.limit) as CommentRow[]
   const items = rows.map((row) => mapComment(row, parent.author_id, ctx.userId))
   const last = rows.at(-1)
   const nextCursor = data.length > input.limit && last

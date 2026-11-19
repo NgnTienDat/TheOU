@@ -69,7 +69,7 @@ begin
   -- Fingerprint là kiểm tra drift, không phải cơ chế xác thực chống DB admin độc hại.
   if exists (select 1 from pg_class where relnamespace = 'public'::regnamespace and relkind in ('v', 'm'))
     or exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and not coalesce((
-      p.proname = 'rls_auto_enable' and p.pronargs = 0 and p.prokind = 'f'
+      (p.proname = 'rls_auto_enable' and p.pronargs = 0 and p.prokind = 'f'
       and p.prorettype = 'event_trigger'::regtype and not p.proretset
       and p.proowner = 'postgres'::regrole and p.prosecdef
       and p.prolang = (select oid from pg_language where lanname = 'plpgsql')
@@ -80,7 +80,16 @@ begin
         and e.evtname = 'ensure_rls' and e.evtowner = 'postgres'::regrole
         and e.evtevent = 'ddl_command_end' and e.evtenabled = 'O'
         and array(select unnest(e.evttags) order by 1)
-          = array['CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO']::text[])
+          = array['CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO']::text[]))
+      -- T11: RPC đã review, chỉ service_role; không mở schema private.
+      or (p.proname = 't11_admin_hide_content' and p.pronargs = 4 and p.prokind = 'f'
+        and p.proargtypes = '2950 25 2950 25'::oidvector and p.prorettype = 'void'::regtype
+        and not p.proretset and not p.prosecdef and p.proowner = 'postgres'::regrole
+        and p.proconfig = array['search_path=""']::text[]
+        and not has_function_privilege('anon',p.oid,'EXECUTE')
+        and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+        and not has_function_privilege('supabase_auth_admin',p.oid,'EXECUTE')
+        and has_function_privilege('service_role',p.oid,'EXECUTE'))
     ), false)) then
     raise exception 'Có public view/function cần rà soát trước khi nghiệm thu T02';
   end if;

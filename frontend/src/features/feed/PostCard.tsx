@@ -6,6 +6,7 @@ import { Icon } from '../../shared/components/Icon.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { useToggleUpvote } from '../votes/useToggleUpvote.ts'
 import { PostImages } from '../posts/PostImages.tsx'
+import { DeletePostButton } from '../posts/DeletePostButton.tsx'
 export function PostCard({ post, detailLink = false }: { post: PostPublic; detailLink?: boolean }) {
   const { notify } = useAuth()
   const vote = useToggleUpvote(post)
@@ -17,6 +18,7 @@ export function PostCard({ post, detailLink = false }: { post: PostPublic; detai
     <div className="post-content-column">
     <header className="post-header">
       <div className="post-byline"><strong>{post.authorLabel}</strong><span className="post-time"> · <time dateTime={post.publishedAt} title={new Date(post.publishedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}>{relativeTime(post.publishedAt)}</time></span></div>
+      {post.isMine && <DeletePostButton key={post.id} postId={post.id} detailLink={detailLink} />}
     </header>
     <p className="post-body">{detailLink ? <Link className="post-detail-link" to={`/bai-viet/${post.id}`} aria-label="Mở bài viết và bình luận" draggable={false} onClick={event=>{
       // React Router không được điều hướng khi người đọc vừa kéo chọn nội dung để copy.

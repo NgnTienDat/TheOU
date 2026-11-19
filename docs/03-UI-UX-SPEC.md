@@ -139,9 +139,11 @@ T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi
 
 ## 7. Luồng 5 — Kiểm duyệt
 
-- Prototype: `/admin` có danh sách bài/bình luận cần gỡ thủ công (có thể tìm bằng ID/link), nút `Ẩn` + yêu cầu lý do; mục tiêu là xử lý được vi phạm ngay cả trước khi có UI report.
+- T11-A local: `/admin` là form tối giản, chỉ hiện khi getMe.isAdmin=true; POST nhận UUID hoặc URL cùng origin `/bai-viet/:id` (không query/hash/credentials), COMMENT nhận exact UUID. Lý do trim1–500 Unicode code points, không control/format/surrogate; xác nhận native trước khi gửi. Có pending/disable/success/lỗi tiếng Việt, không preview target, report queue hoặc dữ liệu tác giả.
 - MVP: `/admin/bao-cao` hiển thị danh sách report, lý do, link nội dung, trạng thái và thao tác xử lý.
-- Người thường truy cập `/admin` nhận 403 + điều hướng về feed; **server cũng từ chối**.
+- Người thường mở `/admin` thấy thông báo không có quyền, không render form; API vẫn bắt buộc ADMIN từ DB và trả403. Link quản trị chỉ xuất hiện trong Cá nhân của admin, giữ ba mục social nav V2.
+
+T11-A thêm nút trash44px có nhãn `Xóa bài viết` chỉ khi PostPublic.isMine; Feed/Detail dùng chung component, không thêm edit/report menu. Cancel không request; pending khóa nút, lỗi giữ bài. Chỉ sau ACK mới loại bài khỏi cache Feed/Detail/comments của đúng Auth scope, Detail về Feed. Admin hide POST/COMMENT cũng chờ ACK, refetch comments/count từ server, không tự cộng/trừ count. Dark/light và mobile390px giữ V2/Theme; keyboard/confirmation dùng controls native. Chưa nghiệm thu Cloud T11 hoặc screen reader/thiết bị thật.
 
 ## 8. Trạng thái giao diện bắt buộc
 
@@ -153,7 +155,7 @@ T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi
 | Đăng ký/đăng nhập | Disable submit trong lúc xử lý | — | Lỗi trường nhập hoặc thông báo Auth an toàn |
 | Viết bài | Loading trên nút Đăng | — | Giữ nội dung đang soạn |
 | Ảnh | Placeholder | Không ảnh | Tự refresh URL có giới hạn, sau đó placeholder; không nút tải lại ngoài gallery |
-| Admin | Skeleton danh sách | Chưa có báo cáo | Không thể tải thông tin |
+| Admin | Nút đang ẩn và khóa form | Form chờ UUID/link và lý do, chưa có report queue | Lỗi validation/không tìm thấy/không có quyền/an toàn; giữ input khi thất bại |
 
 ## 9. Nội dung và giới hạn ngôn ngữ
 
