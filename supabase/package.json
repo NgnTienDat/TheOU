@@ -17,8 +17,12 @@
     "test:t09-cloud": "node --env-file=.env.auth.local scripts/t09-cloud.ts",
     "test:t10-cloud": "node --env-file=.env.auth.local scripts/t10-cloud.ts",
     "test:t11-cloud": "node --env-file=.env.auth.local scripts/t11-cloud.ts",
+    "test:t12-prepare": "node scripts/t12-cloud.ts --prepare",
+    "test:t12-cli-compatibility": "node scripts/t12-cli-compatibility.ts",
+    "test:t12-preflight": "node --env-file=.env.auth.local scripts/t12-cloud.ts --preflight",
     "test:t10-assets": "node scripts/t10-media-assets-check.mjs",
-    "auth:manual": "node --env-file=.env.auth.local scripts/auth-manual.ts"
+    "auth:manual": "node --env-file=.env.auth.local scripts/auth-manual.ts",
+    "test:t12-recovery": "node --env-file=.env.auth.local scripts/t12-recovery-cli.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
