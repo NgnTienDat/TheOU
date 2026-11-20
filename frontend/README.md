@@ -29,7 +29,7 @@ VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-Chọn đúng môi trường Production/Preview/Development cần deploy. Xóa mọi biến `VITE_*` thừa hoặc legacy (đặc biệt key cũ dạng `VITE_SUPABASE_ANON_KEY`, service-role/secret key và token riêng). Các biến hệ thống của Vercel như `VERCEL`, `VERCEL_ENV`, `VERCEL_URL` không nằm trong allowlist `VITE_*` và không được đưa vào bundle. Cấu hình Root Directory là `frontend`, Framework Preset là Vite, sau khi đổi env hãy redeploy không dùng cache để build lại. Không thêm biến `SUPABASE_SERVICE_ROLE_KEY` hoặc secret vào frontend, kể cả khi deploy trên Vercel.
+Chọn đúng môi trường Production/Preview/Development cần deploy. Xóa mọi biến `VITE_*` thừa do người dùng đặt hoặc legacy (đặc biệt key cũ dạng `VITE_SUPABASE_ANON_KEY`, service-role/secret key và token riêng). Vercel có thể tự cung cấp các biến `VITE_VERCEL_*`; bộ kiểm tra chỉ miễn đúng namespace này, vì chúng là metadata deploy và không mở rộng allowlist cho biến ứng dụng tùy ý. Các biến hệ thống `VERCEL_*` không có tiền tố `VITE_*` không bị đưa vào allowlist. Cấu hình Root Directory là `frontend`, Framework Preset là Vite, sau khi đổi env hãy redeploy không dùng cache để build lại. Không thêm biến `SUPABASE_SERVICE_ROLE_KEY` hoặc secret vào frontend, kể cả khi deploy trên Vercel.
 
 ## Kiểm tra
 

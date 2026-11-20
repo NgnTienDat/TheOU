@@ -65,3 +65,12 @@ test('cho phép biến hệ thống Vercel không dùng tiền tố VITE_*', () 
     VERCEL_URL: 'theou.vercel.app',
   }))
 })
+
+test('cho phép đúng namespace VITE_VERCEL_* do Vercel tự cung cấp', () => {
+  assert.doesNotThrow(() => readSupabaseEnv({
+    ...validEnv,
+    VITE_VERCEL_ENV: 'production',
+    VITE_VERCEL_URL: 'theou.vercel.app',
+    VITE_VERCEL_GIT_COMMIT_SHA: 'test-only-commit',
+  }))
+})
