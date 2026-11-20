@@ -28,8 +28,13 @@ export function readSupabaseEnv(env: Record<string, string | undefined>) {
 
   // Vite đưa mọi biến VITE_* vào bundle, kể cả biến không được dùng trực tiếp.
   const allowedKeys = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY']
-  if (Object.keys(env).some((key) => key.startsWith('VITE_') && !allowedKeys.includes(key))) {
-    throw new Error('Có biến VITE_* ngoài danh sách cho phép. Kiểm tra cấu hình để tránh đưa secrets vào trình duyệt.')
+  const unexpectedKeys = Object.keys(env).filter(
+    (key) => key.startsWith('VITE_') && !allowedKeys.includes(key),
+  )
+  if (unexpectedKeys.length > 0) {
+    throw new Error(
+      `Có biến VITE_* ngoài danh sách cho phép: ${unexpectedKeys.join(', ')}. Kiểm tra cấu hình để tránh đưa secrets vào trình duyệt.`,
+    )
   }
 
   return { url, publishableKey }

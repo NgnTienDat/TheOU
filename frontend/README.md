@@ -20,6 +20,17 @@ Trước khi chạy dev, điền `VITE_SUPABASE_URL` và `VITE_SUPABASE_PUBLISHA
 
 Vite đọc `.env.local` tự động. Dev/build dừng với lỗi cấu hình tiếng Việt nếu thiếu biến, sai URL/key hoặc có biến `VITE_*` ngoài danh sách cho phép. Không in giá trị biến. Mọi biến `VITE_*` đều có thể xuất hiện trong trình duyệt: không lưu secret với tiền tố này. `.env.example` chỉ chứa placeholder; `.env.local` không được commit.
 
+### Cấu hình deploy trên Vercel
+
+Trong Project Settings → Environment Variables, chỉ cấu hình hai biến công khai:
+
+```text
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+Chọn đúng môi trường Production/Preview/Development cần deploy. Xóa mọi biến `VITE_*` thừa hoặc legacy (đặc biệt key cũ dạng `VITE_SUPABASE_ANON_KEY`, service-role/secret key và token riêng). Các biến hệ thống của Vercel như `VERCEL`, `VERCEL_ENV`, `VERCEL_URL` không nằm trong allowlist `VITE_*` và không được đưa vào bundle. Cấu hình Root Directory là `frontend`, Framework Preset là Vite, sau khi đổi env hãy redeploy không dùng cache để build lại. Không thêm biến `SUPABASE_SERVICE_ROLE_KEY` hoặc secret vào frontend, kể cả khi deploy trên Vercel.
+
 ## Kiểm tra
 
 **UI-V2 — Post-T08 / Pre-T09:** các route social dùng visual reference [HTML V2](../docs/fe-templates/TheOU-Social-UI-Redesign-V2.html), cột640px, desktop rail và mobile bottom nav. Auth giữ T05; Cá nhân chuyển vào social shell, giữ getMe/updateNickname/logout. Một theme preference `theou.theme`. API/query/submission và DTO không đổi. [UI-V2-A](../docs/reports/UI-V2-A-IMPLEMENTATION.md) ghi kết quả offline; [nghiệm thu cuối](../docs/reports/UI-V2-STATUS-REPORT.md) ghi visual6/6 và Cloud read-only6/6 PASS theo chủ dự án. Không suy ra đã kiểm thử lại Cloud writes hoặc có SQL baseline mới.
