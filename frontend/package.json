@@ -15,6 +15,7 @@
     "test:ui:votes": "node scripts/votes-ui-check.mjs",
     "test:ui:media": "node scripts/media-ui-check.mjs",
     "test:ui:moderation": "node scripts/moderation-ui-check.mjs",
+    "test:ui:e2e": "node scripts/e2e-ui-check.mjs",
     "preview": "vite preview"
   },
   "engines": {

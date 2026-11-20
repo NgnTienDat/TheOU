@@ -20,6 +20,17 @@ Trước khi chạy dev, điền `VITE_SUPABASE_URL` và `VITE_SUPABASE_PUBLISHA
 
 Vite đọc `.env.local` tự động. Dev/build dừng với lỗi cấu hình tiếng Việt nếu thiếu biến, sai URL/key hoặc có biến `VITE_*` ngoài danh sách cho phép. Không in giá trị biến. Mọi biến `VITE_*` đều có thể xuất hiện trong trình duyệt: không lưu secret với tiền tố này. `.env.example` chỉ chứa placeholder; `.env.local` không được commit.
 
+### Cấu hình deploy trên Vercel
+
+Trong Project Settings → Environment Variables, chỉ cấu hình hai biến công khai:
+
+```text
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+Chọn đúng môi trường Production/Preview/Development cần deploy. Xóa mọi biến `VITE_*` thừa hoặc legacy (đặc biệt key cũ dạng `VITE_SUPABASE_ANON_KEY`, service-role/secret key và token riêng). Các biến hệ thống của Vercel như `VERCEL`, `VERCEL_ENV`, `VERCEL_URL` không nằm trong allowlist `VITE_*` và không được đưa vào bundle. Cấu hình Root Directory là `frontend`, Framework Preset là Vite, sau khi đổi env hãy redeploy không dùng cache để build lại. Không thêm biến `SUPABASE_SERVICE_ROLE_KEY` hoặc secret vào frontend, kể cả khi deploy trên Vercel.
+
 ## Kiểm tra
 
 **UI-V2 — Post-T08 / Pre-T09:** các route social dùng visual reference [HTML V2](../docs/fe-templates/TheOU-Social-UI-Redesign-V2.html), cột640px, desktop rail và mobile bottom nav. Auth giữ T05; Cá nhân chuyển vào social shell, giữ getMe/updateNickname/logout. Một theme preference `theou.theme`. API/query/submission và DTO không đổi. [UI-V2-A](../docs/reports/UI-V2-A-IMPLEMENTATION.md) ghi kết quả offline; [nghiệm thu cuối](../docs/reports/UI-V2-STATUS-REPORT.md) ghi visual6/6 và Cloud read-only6/6 PASS theo chủ dự án. Không suy ra đã kiểm thử lại Cloud writes hoặc có SQL baseline mới.
@@ -44,6 +55,8 @@ npm run test:ui:votes
 Bảy route: `/dang-nhap`, `/dang-ky`, `/xac-thuc`, `/ca-nhan`, `/` (Feed), `/bai-viet/moi` (Composer), `/bai-viet/:id` (Detail). Login/OTP thành công vào Feed; guest bị chặn Feed/Composer/Detail; profile/logout giữ nguyên. Phiên do Supabase SDK quản lý; không tự lưu password/OTP/JWT vào storage riêng.
 
 `test:ui:comments` dùng Vite riêng127.0.0.1:5190 với env/API/Auth giả; chặn host ngoài allowlist. Kiểm tra post states, comments OP/privacy, pagination/dedupe/cursor, create replay/snapshot và delete confirm/error/count refresh ở360/390/768/1280px dark/light. Ảnh ở `node_modules/.cache/theou-comments-ui/`, không commit; không chứng minh bàn phím ảo/screen reader/Cloud thật.
+
+`test:ui:e2e` bổ sung luồng React xuyên feature trên Vite127.0.0.1:5194: A tạo bài1/2ảnh, B đọc/upvote/comment, A trả lời OP, refresh counts, NEW/HOT/pages, owner delete và admin POST/COMMENT hide với state giả dùng chung. Ba browser contexts A/B/guest cô lập tại1280/390px dark/light; không Auth/Cloud thật. Đặt `THEOU_BROWSER_PATH` tới **Google Chrome binary đã xác minh** trước khi chạy `npm.cmd run test:ui:e2e`; script yêu cầu biến này và kiểm tra CDP product. Binary mặc định Edge của các scripts cũ không được nhận là Chrome.24ảnh ở `node_modules/.cache/theou-e2e-ui/`; mock audits không chứng minh transaction DB. Xem [T12-B local regression](../docs/reports/T12-B-LOCAL-E2E.md).
 
 Comments chỉ đọc trên post PUBLISHED, một tầng ASC; form1–500 Unicode code points, retry giữ snapshot/key trong bộ nhớ. Xóa chính chủ có confirm; chưa rõ kết quả không giả thành success. Sau write refetch comments/detail/feed counts từ API, không tự cộng/trừ. Query key gắn postId/scope; parent NOT_FOUND chặn tương tác, response trễ bị bỏ. Rời/reload/Auth unmount chưa khôi phục text/key; không persist comment nhạy cảm. T08 đã nghiệm thu API/UI/Cloud; UI-V2 chỉ thay giao diện local, không deploy lại backend. Xem [nghiệm thu T08](../docs/reports/T08-STATUS-REPORT.md).
 

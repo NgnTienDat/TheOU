@@ -44,6 +44,24 @@ test('từ chối secret, JWT legacy và placeholder mà không lộ giá trị'
 })
 
 test('không cho biến VITE ngoài allowlist đi vào bundle', () => {
-  assert.throws(() => readSupabaseEnv({ ...validEnv, VITE_PRIVATE_TOKEN: 'test-only' }), /ngoài danh sách/)
+  assert.throws(
+    () => readSupabaseEnv({ ...validEnv, VITE_PRIVATE_TOKEN: 'test-only-secret' }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.match(error.message, /ngoài danh sách/)
+      assert.match(error.message, /VITE_PRIVATE_TOKEN/)
+      assert.ok(!error.message.includes('test-only-secret'))
+      return true
+    },
+  )
   assert.doesNotThrow(() => readSupabaseEnv({ ...validEnv, SERVER_ONLY: 'test-only' }))
+})
+
+test('cho phép biến hệ thống Vercel không dùng tiền tố VITE_*', () => {
+  assert.doesNotThrow(() => readSupabaseEnv({
+    ...validEnv,
+    VERCEL: '1',
+    VERCEL_ENV: 'production',
+    VERCEL_URL: 'theou.vercel.app',
+  }))
 })
