@@ -31,7 +31,7 @@ export function CommentList({postId,onMissing}:{postId:string;onMissing:(error:u
     }finally{deleting.current.delete(id);if(current())setBusy([...deleting.current])}
   }
   return <section className="comments-section" aria-labelledby="comments-heading">
-    <div className="comments-title"><h2 id="comments-heading">Bình luận</h2><button type="button" className="icon-button" aria-label="Làm mới bình luận" title="Làm mới bình luận" disabled={query.isFetching} onClick={()=>void cache.resetQueries({queryKey:commentsKey(scope,postId),exact:true})}><Icon name="refresh"/></button></div>
+    <div className="comments-title"><h2 id="comments-heading">Bình luận</h2><button type="button" className="icon-button" aria-label="Làm mới bình luận" title="Làm mới bình luận" disabled={query.isFetching} onClick={()=>void refreshComments(cache,scope,postId)}><Icon name="refresh"/></button></div>
     <CommentComposer postId={postId} onMissing={onMissing} onSuccess={()=>refreshComments(cache,scope,postId)}/>
     <div className="comments-content">
     {query.isPending?<p className="state-message" role="status">Đang tải bình luận…</p>:query.isError&&!comments.length?<div role="alert" className="comment-error"><p>Không tải được bình luận</p><button type="button" className="ghost" onClick={()=>void cache.resetQueries({queryKey:commentsKey(scope,postId),exact:true})}>Thử lại</button></div>:!comments.length?<p className="state-message">Chưa có bình luận nào</p>:<ol className="comment-list">{comments.map(comment=><li className="comment-card" key={comment.id}>
