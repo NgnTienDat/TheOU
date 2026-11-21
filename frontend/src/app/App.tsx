@@ -32,13 +32,16 @@ export function App() {
                 <Route path="/xac-thuc" element={<VerificationPage />} />
               </Route>
             </Route>
-            <Route element={<AppFrame />}><Route element={<SessionGate protectedRoute />}>
-              <Route path="/ca-nhan" element={<ProfilePage />} />
-              <Route path="/admin" element={<AdminPage />} />
+            <Route element={<AppFrame />}>
               <Route path="/" element={<FeedPage />} />
-              <Route path="/bai-viet/moi" element={<CreatePostPage />} />
-              <Route path="/bai-viet/:id" element={<PostDetailPage />} />
-            </Route></Route>
+              <Route path="/bang-tin" element={<Navigate to="/" replace />} />
+              <Route element={<SessionGate protectedRoute />}>
+                <Route path="/ca-nhan" element={<ProfilePage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/bai-viet/moi" element={<CreatePostPage />} />
+                <Route path="/bai-viet/:id" element={<PostDetailPage />} />
+              </Route>
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>

@@ -1,97 +1,160 @@
-# TheOU — Bộ tài liệu phát triển Prototype và MVP
+# TheOU
 
-> **Ngôn ngữ làm việc: tiếng Việt.** Tên biến, tên bảng, tên hàm và giá trị enum sử dụng tiếng Anh để thuận tiện lập trình; nội dung sản phẩm, UI, tài liệu, task, PR và báo cáo kiểm thử ưu tiên tiếng Việt.
+**An anonymous-by-default social platform for the Ho Chi Minh City Open University community.**
 
-**Phiên bản tài liệu:** 1.1 — 15/11/2026
+TheOU gives people with a verified `@ou.edu.vn` email a dedicated place to share campus stories, ask questions, and discuss student life. Members can publish anonymously or under a nickname, while the backend keeps account identity separate from public content.
 
-**Trạng thái:** T01 đã có nền tảng frontend; T02 **COMPLETED** ngày 15/11/2026: migration/catalog Cloud đạt, offline 22/22 PASS, Cloud integration 8/8 PASS theo xác nhận chủ dự án; cleanup đã xác minh read-only. Xem [báo cáo T02](docs/reports/T02-STATUS-REPORT.md).
+**Backend-focused full-stack project** 
+[Live Demo](https://theou.tech) | [Frontend Setup](frontend/README.md) | [Supabase Setup](supabase/README.md) | [Architecture](docs/04-ARCHITECTURE.md) | [Database Security](docs/05-DATABASE-SECURITY.md)
 
-**T03 — COMPLETED 16/11/2026:** đăng ký email OU + mật khẩu → OTP xác minh; đăng nhập mật khẩu, passwordless bị chặn phía server. Offline gần nhất 47/47 PASS; signup/OTP sau đổi settings được theo dõi tại T05 khi có OU account mới. Xem [nghiệm thu T03](docs/reports/T03-STATUS-REPORT.md).
+![Frontend CI](https://github.com/NgnTienDat/TheOU/actions/workflows/frontend.yml/badge.svg)
+![Supabase offline checks](https://github.com/NgnTienDat/TheOU/actions/workflows/database.yml/badge.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=black)
 
-**T04 — COMPLETED — PASS 16/11/2026:** social-api/getMe đã deploy, smoke và BANNED/ADMIN/RACE Cloud PASS theo chủ dự án; cleanup khớp baseline. Offline gần nhất 99/99 PASS. Xem [nghiệm thu T04](docs/reports/T04-STATUS-REPORT.md).
-**Sản phẩm:** Mạng xã hội độc lập cho cộng đồng sở hữu email OU; không đại diện hay được bảo trợ bởi Trường Đại học Mở TP.HCM.
+> **Independent project.** TheOU is not affiliated with or endorsed by Ho Chi Minh City Open University. Membership requires verification of an `@ou.edu.vn` mailbox; this does not independently confirm current enrollment.
 
-## Cấu trúc repository và chạy frontend
+## Product Preview
 
-**T05 — COMPLETED — PASS 16/11/2026:** UI login/signup/OTP/profile đã được chủ dự án duyệt; Cloud updateNickname và signup/OTP regression sau tắt passwordless đã PASS. Xem [nghiệm thu T05](docs/reports/T05-STATUS-REPORT.md) và [prototype/conventions](docs/fe-templates/README.md).
+<!--
+  ADD REAL SCREENSHOTS BEFORE PUBLISHING THIS README.
+  Put your screenshots at the following paths, then commit them with README.md:
+    docs/assets/screenshots/feed.png
+    docs/assets/screenshots/post-detail.png
+    docs/assets/screenshots/create-post.png
+  Use sanitized demo content. Do not include real student data, email addresses,
+  internal IDs, session tokens, or personally identifying photos.
+-->
 
-**T06 — COMPLETED — PASS 16/11/2026:** migration/Edge, smoke A/B, controlled writes, DB verification và cleanup đã nghiệm thu; baseline cuối users=2/profiles=2/roles=0/posts=0. Xem [nghiệm thu T06](docs/reports/T06-STATUS-REPORT.md).
+| Feed | Post Detail | Create Post |
+|:---:|:---:|:---:|
+| <img src="docs/assets/screenshots/feed.png" alt="TheOU feed with NEW and HOT sorting, topic filters, and posts" width="280"> | <img src="docs/assets/screenshots/post-detail.png" alt="TheOU post detail with comments and upvotes" width="280"> | <img src="docs/assets/screenshots/create-post.png" alt="TheOU create-post screen with anonymous mode and image attachments" width="280"> |
+| Browse recent and trending discussions | Read and join a conversation | Publish anonymously or with a nickname |
 
-**T07 — COMPLETED — PASS 17/11/2026:** Feed/Composer đã được chủ dự án duyệt6/6 UI checklist, A/B Cloud E2E đạt. Hai bài PUBLISHED được giữ lại theo quyết định chủ dự án, không cleanup. Xem [nghiệm thu T07](docs/reports/T07-STATUS-REPORT.md).
+**Reviewing the project without an OU email?** The live community is restricted to verified `@ou.edu.vn` accounts, and there is no public guest account or read-only feed. The screenshots above provide a view of the main product flows; the architecture, source code, and tests are available in this repository.
 
-**T08 — COMPLETED — PASS (17/11/2026):** Comments API/UI được chủ dự án phê duyệt; frontend54/54, Supabase179/179 offline PASS. Cloud smoke/create/R1 và R2 delete/count đã đạt; chủ dự án xác nhận cleanup sáu fixture, cuối còn hai posts PUBLISHED/hai comments (VISIBLE1/DELETED1), counts1/0, mismatch0. **Giữ hai bài T07 và hai comment thủ công T08**, không cần cleanup thêm. Social UI V2 là thiết kế riêng chưa tích hợp React; không tính hoàn thành V2 hoặc toàn Prototype. Xem [nghiệm thu T08](docs/reports/T08-STATUS-REPORT.md) và [bằng chứng Cloud](docs/reports/T08-B-CLOUD-TESTS.md).
+## Features
 
-**UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026).** Frontend54/54 và ba browser scripts offline PASS tại A; chủ dự án xác nhận visual6/6 và Cloud read-only regression6/6 PASS tại B. Ghi chú V2 chưa tích hợp trong snapshot nghiệm thu T08 phía trên là trạng thái trước task này. Xem [nghiệm thu UI-V2](docs/reports/UI-V2-STATUS-REPORT.md). **T09-A local completed / pending review**: toggleUpvote/trigger atomic và UI optimistic đã có local; Supabase193/193 và frontend63/63 PASS, chưa deploy/push migration/gọi Cloud. Xem [báo cáo T09-A](docs/reports/T09-A-IMPLEMENTATION.md). Không suy ra T09/W2/Prototype đã hoàn thành.
+- **Campus-only access:** email/password registration, one-time email verification via OTP, and server-side account checks.
+- **Anonymous or nickname-based posting:** a shared feed with five campus-related topics, NEW/HOT (24-hour) sorting, and keyset pagination.
+- **Social interactions:** comments, toggleable upvotes, and a *Chủ bài* (original poster) label that does not reveal the author's account identity.
+- **Private image attachments:** up to two images per post, using authorized signed upload and read URLs.
+- **Content controls:** owner-initiated soft deletion and admin-only hiding of posts/comments with an audit trail.
 
-```text
-TheOU/
-├── frontend/    # React + Vite + TypeScript, cấu hình và test frontend
-├── supabase/    # Migrations, tests DB/Auth/API, Edge Function social-api
-├── docs/        # 7 tài liệu đặc tả tiếng Việt
-├── .github/     # CI kiểm tra frontend
-├── .gitignore
-├── AGENTS.md
-└── README.md
+## Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| Client routing & server state | React Router, TanStack Query |
+| Business API | Supabase Edge Functions, TypeScript, Deno |
+| Authentication | Supabase Auth |
+| Data | PostgreSQL, migrations, constraints, triggers, RLS |
+| Media | Private Supabase Storage |
+| Hosting & CI | Vercel, Supabase, GitHub Actions |
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    U[Verified OU member] --> WEB[React SPA]
+    WEB --> AUTH[Supabase Auth]
+    WEB --> API[Edge Function: social-api]
+    API --> DB[(PostgreSQL)]
+    API --> STORAGE[Private Storage]
+    WEB -->|Signed image upload| STORAGE
+    API -->|Authorized signed read URLs| WEB
 ```
 
-Dùng Node.js >= 22.18 (CI dùng 24). Trong `frontend/`, chạy `npm ci`, tạo `.env.local` từ `.env.example` nếu chưa có, điền URL và publishable key rồi chạy `npm run dev`. Xem [hướng dẫn frontend](frontend/README.md) để cấu hình và chạy lint/typecheck/test/build.
+The React client uses Supabase Auth for sessions. **All social business operations go through `social-api`**, rather than direct reads and writes to application tables. This keeps authentication, authorization, and public response shaping at a controlled server boundary. The frontend depends on a typed `SocialApiClient` contract, making the API implementation replaceable without rewriting the UI.
 
-Chỉ đưa publishable key vào frontend; không commit `.env.local`, secret/service-role key hay signing keys. Frontend gọi nghiệp vụ bằng adapter `createSocialApi`; không truy cập bảng trực tiếp. Development dùng **Supabase Cloud TheOU-dev**, không Docker/Local Stack. Xem [hướng dẫn Supabase](supabase/README.md) để kiểm tra offline và review trước khi triển khai Cloud.
+### Engineering Decisions
 
-## Mục tiêu theo mốc
+**1. Protect anonymous identity at the API boundary.** Anonymous posts must not expose an account identifier that can be correlated across discussions. The API returns allowlisted public DTOs (such as `authorLabel`, `isMine`, and `isOriginalPoster`) instead of raw rows. Direct client access to business tables is restricted through grants and RLS; server-side authorization checks also apply when privileged database credentials are used.
 
-| Mốc | Thời gian | Kết quả phải có |
-|---|---|---|
-| **Prototype** | Tuần 1–2 | Hai tài khoản OU đăng ký mật khẩu, xác minh OTP rồi đăng nhập mật khẩu → bảng tin → đăng ẩn danh → bình luận/upvote → phản hồi với nhãn Chủ bài; có tag, ảnh và công cụ admin gỡ nội dung tối thiểu; chạy online trong nhóm test khép kín. |
-| **MVP beta** | Tuần 3–4 | Hoàn thiện report, kiểm duyệt, chống spam/rate limit, bảo mật và trải nghiệm mobile; mở thử nghiệm giới hạn sau khi vượt kiểm thử. |
+**2. Enforce consistency in PostgreSQL.** Post and comment creation use per-author idempotency keys so retries do not silently create duplicate content. Post publishing uses a conditional `DRAFT → PUBLISHED` transition. Unique vote constraints, explicit desired vote state, and database triggers keep concurrent interactions and engagement counters consistent without introducing a separate distributed-lock service.
 
-**Không thuộc phạm vi 4 tuần:** kết bạn, theo dõi, nhắn tin nội bộ, thông báo push, video, AI recommendation, marketplace có giỏ hàng/thanh toán, tìm kiếm full-text, dashboard phân tích phức tạp, app native.
+**3. Authorize media throughout its lifecycle.** Images are stored in a private bucket. The backend reserves an upload slot, issues a signed upload token, validates the uploaded object, and marks it ready before the post can be published. Readers receive short-lived signed URLs only after the server verifies access.
 
-## Đọc tài liệu theo thứ tự
+**4. Make moderation accountable.** Owners can soft-delete their content. Admin-only moderation verifies permissions on the server and records the content change and audit entry together in a database transaction.
 
-1. [`docs/01-PRD.md`](docs/01-PRD.md): mục tiêu, quy tắc sản phẩm, phạm vi và KPI.
-2. [`docs/02-USER-STORIES.md`](docs/02-USER-STORIES.md): user stories, acceptance criteria, trường hợp lỗi.
-3. [`docs/03-UI-UX-SPEC.md`](docs/03-UI-UX-SPEC.md): màn hình, luồng và trạng thái giao diện.
-4. [`docs/04-ARCHITECTURE.md`](docs/04-ARCHITECTURE.md): kiến trúc, kỹ thuật, cách chuyển dần sang backend riêng.
-5. [`docs/05-DATABASE-SECURITY.md`](docs/05-DATABASE-SECURITY.md): mô hình dữ liệu, bảo mật và quy tắc ẩn danh.
-6. [`docs/06-API-CONTRACT.md`](docs/06-API-CONTRACT.md): hợp đồng dữ liệu và các thao tác từ frontend.
-7. [`docs/07-IMPLEMENTATION-PLAN.md`](docs/07-IMPLEMENTATION-PLAN.md): backlog 4 tuần, test gate, Definition of Done.
+For implementation details and design boundaries, see the [architecture](docs/04-ARCHITECTURE.md), [security model](docs/05-DATABASE-SECURITY.md), and [API contract](docs/06-API-CONTRACT.md).
 
-[`AGENTS.md`](AGENTS.md) là chỉ dẫn làm việc cho Codex, **không thay thế** các tài liệu nguồn.
+## Getting Started
 
-## Quy tắc giải quyết mâu thuẫn
+### Requirements
 
-1. Bảo mật và bảo vệ danh tính trong `05-DATABASE-SECURITY.md` không được đánh đổi để đẩy nhanh tiến độ.
-2. `01-PRD.md` quyết định phạm vi; `02-USER-STORIES.md` quyết định hành vi; `06-API-CONTRACT.md` quyết định hợp đồng kỹ thuật.
-3. Khi tài liệu mâu thuẫn: dừng thay đổi có rủi ro, đề xuất bản sửa trước khi code.
-4. Không tự thêm tính năng ngoài P0/P1 được định nghĩa.
+- Node.js **22.18+** and npm (CI uses Node.js 24).
+- Access to a configured Supabase project for authentication and live social features.
 
-## Quyết định đã chốt
+### Run the frontend
 
-- Frontend: **React + Vite + TypeScript + Tailwind CSS**, React Router, TanStack Query.
-- Backend giai đoạn đầu: **Supabase Auth + PostgreSQL + Storage + Edge Functions**. Chưa có NestJS/Spring Boot riêng.
-- Auth: đăng ký email `@ou.edu.vn` + mật khẩu, OTP 6 số xác minh đăng ký; đăng nhập email + mật khẩu, không OTP. Xác minh domain ở server; phải cấu hình nhà cung cấp email trước beta.
-- Feed: một luồng chung, 2 cách sắp xếp **Mới nhất / Nổi bật 24h**, 5 tag cố định.
-- Nội dung: text tối đa **1.000 ký tự**, tối đa **2 ảnh**, mỗi ảnh tối đa **2 MiB** sau xử lý.
-- Tương tác: **upvote, không downvote** trong MVP; không tự ẩn chỉ vì nhiều report.
-- Danh tính: **Ẩn danh (mặc định)** hoặc **Hiện biệt danh**; không bao giờ công khai email, MSSV, `author_id`.
-- Mọi truy cập dữ liệu nghiệp vụ qua Edge Function `social-api`; frontend không gọi trực tiếp bảng nghiệp vụ bằng `.from(...)`.
+```bash
+git clone https://github.com/NgnTienDat/TheOU.git
+cd TheOU/frontend
+npm ci
+cp .env.example .env.local
+```
 
-## Tham khảo kỹ thuật chính (đối chiếu ngày 13/11/2026)
+Add your Supabase project values to `frontend/.env.local`:
 
-- Email OU: https://docs.ou.edu.vn/books/huong-dan-sinh-vien-su-dung-cac-dich-vu-tien-ich/page/thong-tin-cac-loai-tai-khoan-danh-cho-sinh-vien
-- Supabase email/password: https://supabase.com/docs/guides/auth/passwords
-- Template OTP xác minh signup: https://supabase.com/docs/guides/auth/auth-email-templates
-- Before User Created Hook: https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook
-- SMTP: https://supabase.com/docs/guides/auth/auth-smtp
-- Edge Function auth: https://supabase.com/docs/guides/functions/auth
-- RLS/grants: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Private Storage: https://supabase.com/docs/guides/storage/buckets/fundamentals
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
 
-> **Lưu ý vận hành:** Các nguồn của trường có thể thay đổi theo khóa học; kiểm chứng việc nhận OTP ở tài khoản OU đang hoạt động trước khi mở đăng ký.
+Then start the development server:
 
+```bash
+npm run dev
+```
 
-## Bổ sung, tập trung vào giá trị cốt lõi của TheOU
-TheOU tập trung vào hai giá trị:
-- Tính cộng đồng: Đọc những câu chuyện, tình cảm, sự kiện, share meme và vấn đề mà chỉ sinh viên OU mới thấy gần gũi.
-- Tính hữu ích: Tìm lại bài về môn học, tài liệu, kinh nghiệm, câu hỏi đã được giải đáp một cách dễ dàng.
+Only the publishable key belongs in a `VITE_*` variable. Keep service-role keys, database credentials, SMTP credentials, and signing secrets out of the frontend and repository.
+
+### Backend development and tests
+
+The current development workflow uses **Supabase Cloud** for Auth, database, Storage, and the deployed `social-api` function. A Supabase local Docker stack is **not configured as a supported one-command setup** in this repository. To work on backend code and run its offline checks:
+
+```bash
+cd ../supabase
+npm ci
+npm run typecheck
+npm test
+```
+
+These checks exercise the backend/SQL test setup without standing up the full live Supabase services. Running the application end to end requires a Supabase project configured with the repository migrations, Auth settings, the `social-api` Edge Function, a private `post-media` bucket, and an email provider. Follow the [Supabase setup guide](supabase/README.md) for the project-specific Cloud configuration and deployment procedure. Do not run database reset or migration push commands against a shared Cloud project without reviewing their effects.
+
+## Testing
+
+The project uses automated frontend and Supabase-side checks, alongside focused integration testing for authentication, authorization, and critical data flows.
+
+| Area | Coverage |
+|---|---|
+| Frontend CI | Lint, TypeScript checks, unit tests, production build |
+| Supabase-side CI | Edge checks and PGlite-backed database/API tests |
+| Security | Invalid sessions, cross-account access, restricted raw-table access, role and ownership checks |
+| Data integrity | Idempotent post/comment creation, concurrent votes, database-managed counts |
+| Media and moderation | Private upload/read flows, deletion permissions, audit records |
+
+**Latest documented local test snapshot:** **312 Supabase-side tests** and **94 frontend tests** passing. These numbers describe the recorded local suites, not a load benchmark or a claim that every browser test runs against live Cloud services.
+
+## Future Improvements
+
+- Expand member reporting and moderation workflows.
+- Strengthen abuse prevention and operational monitoring before broader rollout.
+- Automate media cleanup/recovery and establish repeatable staging and rollback procedures.
+- Benchmark feed and interaction workloads before introducing caching or additional coordination components.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [Product Requirements](docs/01-PRD.md) | Product goals and scope |
+| [User Stories](docs/02-USER-STORIES.md) | User flows and acceptance criteria |
+| [UI/UX Specification](docs/03-UI-UX-SPEC.md) | Screens and interaction behavior |
+| [Architecture](docs/04-ARCHITECTURE.md) | Components and trade-offs |
+| [Database & Security](docs/05-DATABASE-SECURITY.md) | Schema, authorization, anonymity model |
+| [API Contract](docs/06-API-CONTRACT.md) | Client/server interface |
+| [Implementation Plan](docs/07-IMPLEMENTATION-PLAN.md) | Engineering milestones and test gates |
