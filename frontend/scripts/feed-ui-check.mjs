@@ -56,6 +56,7 @@ try {
     if (url.pathname.endsWith('/token')) body = session
     else if (url.pathname.endsWith('/user')) body = user
     else if (url.pathname.endsWith('/logout')) body = {}
+    else if (url.pathname.endsWith('/public-feed')) { assert.equal(request.headers()['authorization'], undefined); body = envelope({ items: [], nextCursor: null }) }
     else if (url.pathname.endsWith('/social-api')) {
       assert.equal(request.headers().authorization, `Bearer ${jwt}`, 'request nghiệp vụ gắn đúng phiên')
       if (input.action === 'getMe') body = envelope({ nickname: 'OUer riêng tư', emailMasked: '***@ou.edu.vn', isAdmin: false })
@@ -124,11 +125,12 @@ try {
     await page.getByRole('link', { name: 'Hủy', exact: true }).click(); await feed()
   }
   async function login() {
+    if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap')
     await page.getByLabel('Email trường', { exact: true }).fill(user.email)
     await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!')
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await feed()
   }
-  for (const path of ['/', '/bai-viet/moi']) { await page.goto(`${origin}${path}`); await page.waitForURL('**/dang-nhap') }
+  for (const path of ['/bai-viet/moi']) { await page.goto(`${origin}${path}`); await page.waitForURL('**/dang-nhap') }
   feedMode = 'hold'; await login()
   await page.getByRole('status', { name: 'Đang tải bảng tin' }).waitFor()
   assert.equal(await page.locator('.skeleton-card').count(), 3)
@@ -228,13 +230,13 @@ try {
   await leave()
   const theme = await page.getAttribute('html', 'data-theme')
   await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.waitForSelector('.profile-name'); assert.equal(await page.getAttribute('html', 'data-theme'), theme)
-  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('**/dang-nhap')
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/')
   feedMode = 'empty'; await login(); await page.getByRole('heading', { name: 'Chưa có bài viết nào. Hãy mở đầu câu chuyện!' }).waitFor(); assert.equal(await page.locator('.post-card').count(), 0)
   feedMode = 'forbidden'; await refresh(); await page.getByText('Tài khoản không đủ điều kiện truy cập TheOU hoặc đã bị khóa.', { exact: true }).waitFor()
   assert.equal(await page.locator('.post-card').count(), 0); assert.equal(await page.locator('.composer-card').count(), 0)
-  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('**/dang-nhap')
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/')
   feedMode = 'many'; await login(); await page.locator('.post-card').first().waitFor()
-  feedMode = 'expired'; await refresh(); await page.waitForURL('**/dang-nhap'); assert.equal(await page.locator('.post-card').count(), 0)
+  feedMode = 'expired'; await refresh(); await page.getByRole('link', { name: 'Đăng nhập để tương tác', exact: true }).waitFor(); assert.equal(await page.locator('.post-card').count(), 0)
   assert.deepEqual(runtimeErrors, [])
   console.log(`PASS: Feed/Composer browser offline — ${shots} screenshots; 360/390/768/1280px dark/light; filters/races/pages/cursor/states/privacy, composer retry/validation/double-submit, routing/Auth/theme. Không gọi Cloud.`)
   console.log('Ảnh dữ liệu giả: frontend/node_modules/.cache/theou-feed-ui/ (gitignored).')

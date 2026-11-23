@@ -33,6 +33,7 @@ try{
     if(url.pathname.endsWith('/token'))body=session
     else if(url.pathname.endsWith('/user'))body=user
     else if(url.pathname.endsWith('/logout'))body={}
+    else if(url.pathname.endsWith('/public-feed')){assert.equal(request.headers()['authorization'],undefined);body=envelope({items:[],nextCursor:null})}
     else if(url.pathname.endsWith('/social-api')){
       assert.equal(request.headers().authorization,`Bearer ${jwt}`)
       if(input.action==='getMe')body=envelope({nickname:'OUer riêng tư',emailMasked:'***@ou.edu.vn',isAdmin:false})
@@ -198,7 +199,7 @@ try{
   await page.goto(`${origin}/bai-viet/${id(1)}`);await page.getByRole('heading',{name:'Không tải được bài viết',exact:true}).waitFor()
   postMode='ready';await page.getByRole('button',{name:'Thử lại',exact:true}).click();await page.locator('.comment-card').first().waitFor()
   const theme=await page.getAttribute('html','data-theme');await back();assert.equal(await page.getAttribute('html','data-theme'),theme)
-  await page.getByRole('link',{name:'Cá nhân',exact:true}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await page.waitForURL('**/dang-nhap');assert.equal(await page.locator('.comment-card').count(),0)
+  await page.getByRole('link',{name:'Cá nhân',exact:true}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await page.waitForURL(origin + '/');assert.equal(await page.locator('.comment-card').count(),0)
   assert.deepEqual(errors,[])
   console.log(`PASS: Comments browser offline — ${shots} screenshots; whole-card link/keyboard/modifiers/text selection/controls, thread desktop/fixed mobile, composer resize/validation/replay, OP/privacy/pagination/delete/count/Auth/theme. Không gọi Cloud.`)
   console.log('Ảnh dữ liệu giả: frontend/node_modules/.cache/theou-comments-ui/ (gitignored).')

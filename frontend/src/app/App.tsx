@@ -22,7 +22,8 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/* Auth external-store updates phải nhìn thấy route logout đã commit trước guard redirect. */}
+      <BrowserRouter useTransitions={false}>
         <AuthProvider>
           <Routes>
             <Route element={<AuthLayout />}>

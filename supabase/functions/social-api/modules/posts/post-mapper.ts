@@ -12,6 +12,40 @@ import {
 // Chỉ các cột cần ở Edge; không select * hoặc serialize row qua response.
 export const postColumns =
   'id,author_id,tag,body,display_mode,nickname_snapshot,contact_url,status,published_at,upvote_count,comment_count,post_images(id,post_id,storage_path,mime_type,size_bytes,position,status)'
+export const guestPostColumns = 'id,tag,body,display_mode,status,published_at,upvote_count,comment_count'
+
+export function mapGuestPost(
+  row: Pick<
+    PostRow,
+    'id' | 'tag' | 'body' | 'display_mode' | 'status' | 'published_at' | 'upvote_count' | 'comment_count'
+  >,
+): PostPublic {
+  if (
+    !row || !uuidPattern.test(row.id) || row.status !== 'PUBLISHED' || row.display_mode !== 'ANONYMOUS' ||
+    !postTags.includes(row.tag) || typeof row.body !== 'string' || [...row.body].length < 1 ||
+    [...row.body].length > 1000 ||
+    typeof row.published_at !== 'string' || !timestampPattern.test(row.published_at) ||
+    !Number.isFinite(Date.parse(row.published_at)) ||
+    !Number.isSafeInteger(row.upvote_count) || row.upvote_count < 0 ||
+    !Number.isSafeInteger(row.comment_count) || row.comment_count < 0
+  ) {
+    throw new ApiError('INTERNAL_ERROR')
+  }
+  return {
+    id: row.id,
+    tag: row.tag,
+    body: row.body,
+    displayMode: 'ANONYMOUS',
+    authorLabel: 'OUer ẩn danh',
+    contactUrl: null,
+    publishedAt: row.published_at.replace('+00:00', 'Z'),
+    upvoteCount: row.upvote_count,
+    commentCount: row.comment_count,
+    hasUpvoted: false,
+    isMine: false,
+    images: [],
+  }
+}
 export interface PostRow {
   id: string
   author_id: string

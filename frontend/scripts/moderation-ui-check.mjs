@@ -37,6 +37,7 @@ try {
     if (url.pathname.endsWith('/token')) body = session
     else if (url.pathname.endsWith('/user')) body = user
     else if (url.pathname.endsWith('/logout')) body = {}
+    else if (url.pathname.endsWith('/public-feed')) { assert.equal(req.headers()['authorization'], undefined); body = envelope({ items: [], nextCursor: null }) }
     else if (url.pathname.endsWith('/social-api')) {
       assert.equal(req.headers().authorization, `Bearer ${session.access_token}`)
       if (input.action === 'getMe') body = envelope({ nickname: 'OUer offline', emailMasked: '***@ou.edu.vn', isAdmin: admin })
@@ -64,9 +65,9 @@ try {
       await page.screenshot({ path: join(artifacts, `${name}-${width}-${theme}.png`), fullPage: true }); shots++
     }
   }
-  const login = async () => { await page.getByLabel('Email trường', { exact: true }).fill(user.email); await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!'); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(origin + '/') }
+  const login = async () => { if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap'); await page.getByLabel('Email trường', { exact: true }).fill(user.email); await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!'); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(origin + '/') }
   const confirm = async (name, accept = true) => { page.once('dialog', dialog => accept ? dialog.accept() : dialog.dismiss()); await page.getByRole('button', { name, exact: true }).click() }
-  await page.goto(origin); await page.waitForURL('**/dang-nhap'); await login()
+  await page.goto(origin + '/dang-nhap'); await page.waitForURL('**/dang-nhap'); await login()
   await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).count(), 1, 'chỉ owner có delete')
   await page.locator('.post-image-frame img').waitFor(); await shot('owner-feed')
@@ -106,7 +107,7 @@ try {
   for (let n = 0; n < 100 && !held; n++) await page.waitForTimeout(20)
   assert.ok(held); assert.equal(await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).isDisabled(), true)
   const count = calls.length; await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).evaluate(node => { node.click(); node.click() }); assert.equal(calls.length, count)
-  await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('**/dang-nhap')
+  await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/')
   await login(); mode = ''; release(); await page.waitForTimeout(200); assert.equal(new URL(page.url()).pathname, '/')
   assert.deepEqual(errors, [])
   console.log(`PASS: T11 moderation browser offline; ${shots} screenshots, owner delete/cancel/error/pending/navigation/session, admin allow/deny/POST/COMMENT/validation, media/count/privacy,390/1280 dark/light. Không gọi Cloud.`)

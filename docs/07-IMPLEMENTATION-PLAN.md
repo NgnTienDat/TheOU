@@ -5,6 +5,10 @@
 
 ## 1. Nguyên tắc thực thi
 
+**GUEST-FEED B1/B2 — 23/11/2026:** Owner xác nhận **B1 TheOU-dev MANUAL PASS** cho Guest Guard, Member Regression và Public Feed; không phải automated Cloud test của agent. [Dev acceptance](reports/PUBLIC-GUEST-FEED-DEV-ACCEPTANCE.md) bổ sung kết quả sau Phase A bên dưới. [Staging promotion plan](reports/PUBLIC-GUEST-FEED-STAGING-PROMOTION.md) chỉ nhắm `gxsfbzaconeaxwztynpm` / `https://theou.tech`, scope public rỗng ban đầu; source/artifact/env/JWT/secrets/rollback phải được đối chiếu trước deploy. B2 chưa smoke/acceptance, không coi dev PASS là staging PASS hoặc đóng T13/W2; không deploy, sửa secrets, stage/commit/push trong lượt chuẩn bị này.
+
+**GUEST-FEED — owner yêu cầu 23/11/2026:** Phase A implementation/local checks, chưa Phase B/Cloud acceptance. `/` Feed guest/member, `/bang-tin` alias, separate read-only public-feed, explicit server scope mặc định rỗng, no guest images/detail/interactions. Giữ social-api JWT, grants/RLS/OU policy; không migration. Các guard/JWT/ownership/ADMIN/UI regressions cùng deployment/rollback được ghi tại [báo cáo local](reports/PUBLIC-GUEST-FEED-LOCAL.md). Owner review local diff + exact approved post IDs + public exposure/traffic risk trước khi duyệt secrets/config/Edge/frontend deployment và smoke Cloud. Không tick các Cloud acceptance cũ thành public-feed PASS; không tự deploy hoặc push main.
+
 - Không triển khai 7 feature song song trong tuần 1: đi theo **vertical slice** đầu cuối.
 - Mỗi task có: ID, phạm vi, tiêu chí nghiệm thu, test, migration nếu có.
 - Mỗi ngày kết thúc bằng build/typecheck và ít nhất một bước chạy thực tế; tránh tích hợp tất cả vào ngày cuối.

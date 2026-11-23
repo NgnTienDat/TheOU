@@ -1,5 +1,9 @@
 # 03 — Đặc tả UI/UX và User Flows
 
+## Guest feed — Phase A local, 23/11/2026
+
+`/` dùng FeedPage/shell V2 cho cả guest/member; `/bang-tin` redirect `/`. Guest có NEW/HOT, tag, pagination, loading/empty/error/retry; không Landing Page. Read-only cards không link Detail hoặc ảnh, không vote/share/delete/contact. Hiện CTA **Đăng nhập để tương tác** → `/dang-nhap`; nút viết bài cũng tới login, nav Cá nhân/Admin bị ẩn. Empty state: chưa có bài công khai, không giả dữ liệu demo. Route Detail/Compose/Profile/Admin vẫn protected. Login về `/`; logout điều hướng `/` trước khi dọn session để tránh route trung gian/loop. Phiên loading/BANNED/error không kích hoạt member hoặc guest query; hiển thị trạng thái Auth/retry/logout. Giữ theme, responsive, focus và UI conventions đã duyệt; Cloud chưa kiểm thử.
+
 ## 1. Định hướng giao diện
 
 **Visual reference hiện tại:** Auth dùng prototype T05; các trang social dùng [TheOU Social UI V2 và conventions](fe-templates/README.md). **UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026)**; chủ dự án nghiệm thu visual6/6 và Cloud read-only regression6/6. Xem [báo cáo cuối](reports/UI-V2-STATUS-REPORT.md). T01–T08 giữ trạng thái nghiệm thu đã chốt. HTML quyết định appearance; bảo mật, API và nghiệp vụ vẫn theo tài liệu nguồn. Bỏ preview/mock/OTP mẫu. Login/OTP về `/` sau getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. T09-A upvote đã triển khai local, chờ review/deploy; chưa nghiệm thu T09.
@@ -17,7 +21,7 @@
 | `/dang-nhap` | Đăng nhập | Khách | W1 |
 | `/dang-ky` | Đăng ký | Khách | W1 |
 | `/xac-thuc` | Xác minh email đăng ký | Khách có đăng ký đang chờ xác minh | W1 |
-| `/` | Bảng tin | Thành viên OU | W1 |
+| `/` | Bảng tin (guest allowlist/member feed riêng) | Tất cả | Guest Phase A local |
 | `/bai-viet/moi` | Viết bài | Thành viên OU | W1 |
 | `/bai-viet/:id` | Chi tiết bài & bình luận | Thành viên OU | W2 |
 | `/ca-nhan` | Biệt danh và đăng xuất | Thành viên OU | W1 |
@@ -90,7 +94,7 @@ flowchart TD
                  [+ Viết bài]
 ```
 
-- Feed không kéo dữ liệu nếu chưa đăng nhập.
+- Guest Feed chỉ gọi `public-feed`; không tải member feed khi chưa đăng nhập hoặc khi session chưa được xác định.
 - Nút viết bài luôn dễ thấy trên mobile, không che nội dung quan trọng.
 - Khi chuyển tab/tag, về đầu feed và reset cursor; giữ vị trí cuộn nếu mở bài rồi quay lại là cải tiến P1.
 - Bài viết `ANONYMOUS` ghi `OUer ẩn danh`; `NICKNAME` ghi nickname snapshot.

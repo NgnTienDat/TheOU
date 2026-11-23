@@ -164,6 +164,7 @@ try {
     if (url.pathname.endsWith('/token')) body = session
     else if (url.pathname.endsWith('/user')) body = user
     else if (url.pathname.endsWith('/logout')) body = {}
+    else if (url.pathname.endsWith('/public-feed')) { assert.equal(req.headers()['authorization'], undefined); body = envelope({ items: [], nextCursor: null }) }
     else if (url.pathname.endsWith('/social-api')) {
       assert.equal(req.headers().authorization, `Bearer ${token}`)
       calls.push(input.action)
@@ -227,7 +228,7 @@ try {
       for (const theme of ['dark', 'light']) await shot(name, width, theme)
     }
   }
-  await page.goto(origin)
+  await page.goto(origin + '/dang-nhap')
   await page.getByLabel('Email trường', { exact: true }).fill(user.email)
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-Password-Only-123')
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
@@ -467,10 +468,11 @@ try {
   assert.ok(readHeld)
   await page.getByRole('link', { name: 'Cá nhân', exact: true }).click()
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
-  await page.waitForURL('**/dang-nhap')
+  await page.waitForURL(origin + '/')
   holdRead = false; imageError = false; releaseRead()
   await page.waitForTimeout(400)
   assert.equal(await page.locator('.post-images').count(), 0, 'Late URL không tái xuất hiện sau logout')
+  await page.goto(origin + '/dang-nhap')
   await page.getByLabel('Email trường', { exact: true }).fill(user.email)
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-Password-Only-123')
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()

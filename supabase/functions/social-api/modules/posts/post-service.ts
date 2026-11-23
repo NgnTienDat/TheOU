@@ -3,7 +3,7 @@ import { signedImages } from '../media/media-service.ts'
 import type { Profile } from '../profile/get-me.ts'
 import { ApiError } from '../../shared/response.ts'
 import { assertCursorSecret, decodeCursor, encodeCursor } from './post-cursor.ts'
-import { mapPost, postColumns, type PostPublic, type PostRow } from './post-mapper.ts'
+import { guestPostColumns, mapPost, postColumns, type PostPublic, type PostRow } from './post-mapper.ts'
 import { type CreatePostInput, type ListPostsInput, uuidPattern } from './post-validation.ts'
 
 interface Context {
@@ -125,11 +125,28 @@ export async function getPost(ctx: Context, postId: string) {
 }
 
 export async function listPosts(ctx: Context, input: ListPostsInput, secret: string, now: number) {
+  const page = await queryPostPage(ctx.client, input, secret, now, ctx.signal)
+  return { items: await publicPosts(ctx, page.rows), nextCursor: page.nextCursor }
+}
+
+export async function queryPostPage(
+  client: SupabaseClient,
+  input: ListPostsInput,
+  secret: string,
+  now: number,
+  signal: AbortSignal,
+  publicIds?: string[],
+) {
   assertCursorSecret(secret)
   const cursor = input.cursor ? await decodeCursor(input.cursor, input, secret, now) : null
   const asOf = cursor?.asOf ?? now
-  let query = ctx.client.from('posts').select(postColumns).eq('status', 'PUBLISHED')
+  if (publicIds && !publicIds.length) return { rows: [], nextCursor: null }
+  let query = client.from('posts').select(publicIds ? guestPostColumns : postColumns).eq(
+    'status',
+    'PUBLISHED',
+  )
     .lte('published_at', new Date(asOf).toISOString())
+  if (publicIds) query = query.in('id', publicIds).eq('display_mode', 'ANONYMOUS')
   if (input.tag) query = query.eq('tag', input.tag)
   if (input.sort === 'HOT') {
     // shortcut: vote thay đổi có thể gây lặp/bỏ sót; T07 cần dedupe/refresh, snapshot nếu cần sau này.
@@ -149,10 +166,9 @@ export async function listPosts(ctx: Context, input: ListPostsInput, secret: str
   const { data, error } = await query.order('published_at', { ascending: false }).order('id', {
     ascending: false,
   })
-    .limit(input.limit + 1).abortSignal(ctx.signal)
+    .limit(input.limit + 1).abortSignal(signal)
   if (error || !Array.isArray(data)) throw new ApiError('INTERNAL_ERROR')
-  const rows = data.slice(0, input.limit) as PostRow[]
-  const items = await publicPosts(ctx, rows)
+  const rows = data.slice(0, input.limit) as unknown as PostRow[]
   const last = rows.at(-1)
   const nextCursor = data.length > input.limit && last
     ? await encodeCursor({
@@ -164,5 +180,5 @@ export async function listPosts(ctx: Context, input: ListPostsInput, secret: str
       upvoteCount: last.upvote_count,
     }, secret)
     : null
-  return { items, nextCursor }
+  return { rows, nextCursor }
 }

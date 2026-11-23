@@ -24,6 +24,8 @@ const envelope = data => ({ data, error: null, meta: { requestId: '00000000-0000
 try {
   browser = await chromium.launch({ executablePath: process.env.THEOU_BROWSER_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true })
   const context = await browser.newContext({ reducedMotion: 'reduce' })
+  // Fixture theme có chủ đích; không giả định default hiện tại của sản phẩm là dark.
+  await context.addInitScript(() => { if (!localStorage.getItem('theou.theme')) localStorage.setItem('theou.theme', 'dark') })
   const page = await context.newPage()
   const pageErrors = []
   page.on('pageerror', () => pageErrors.push('runtime error'))
@@ -46,6 +48,7 @@ try {
       else body = session
     } else if (url.pathname.endsWith('/user')) body = user
     else if (url.pathname.endsWith('/logout')) body = {}
+    else if (url.pathname.endsWith('/public-feed')) { assert.equal(request.headers()['authorization'], undefined); body = envelope({ items: [], nextCursor: null }) }
     else if (url.pathname.endsWith('/social-api')) {
       if (mode === 'banned') { status = 403; body = { data: null, error: { code: 'FORBIDDEN', message: 'Bị khóa', details: null }, meta: envelope(null).meta } }
       else if (mode === 'server') { status = 500; body = {} }
@@ -84,6 +87,7 @@ try {
     }
   }
   async function login(password = 'Offline-password!') {
+    if (await page.locator('input[name=email]').count() === 0) await page.goto('http://127.0.0.1:5188/dang-nhap')
     await page.getByLabel('Email trường', { exact: true }).fill(user.email)
     await page.getByLabel('Mật khẩu', { exact: true }).fill(password)
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
@@ -96,7 +100,7 @@ try {
     }
     await page.waitForSelector('.profile-name')
   }
-  async function logout() { await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForSelector('input[name=email]') }
+  async function logout() { await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('http://127.0.0.1:5188/'); await page.goto('http://127.0.0.1:5188/dang-nhap'); await page.waitForSelector('input[name=email]') }
   await page.goto('http://127.0.0.1:5188/ca-nhan')
   await page.waitForURL('**/dang-nhap'); await page.waitForSelector('input[name=email]')
   assert.equal(await page.getAttribute('html', 'data-theme'), 'dark')

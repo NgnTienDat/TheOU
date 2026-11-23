@@ -13,6 +13,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "scripts/**/*.ts", "functions/social-api/**/*.ts"],
-  "exclude": ["functions/social-api/index.ts"]
+  "include": ["tests/**/*.ts", "scripts/**/*.ts", "functions/social-api/**/*.ts", "functions/public-feed/**/*.ts"],
+  "exclude": ["functions/social-api/index.ts", "functions/public-feed/index.ts"]
 }

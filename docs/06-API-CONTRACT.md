@@ -6,12 +6,14 @@
 
 - Dữ liệu Auth (`signUp`, `verifyOtp`, `signInWithPassword`, `signOut`) do module Auth gọi `supabase.auth` trực tiếp; UI component không gọi SDK. OTP chỉ xác minh đăng ký, không dùng đăng nhập không mật khẩu.
 - Nghiệp vụ sử dụng `supabase.functions.invoke('social-api', { body: { action, payload } })` với JWT người dùng; **mọi action đều POST JSON**.
-- `social-api` yêu cầu user JWT; sau khi xác thực, kiểm tra email OU **đã xác minh**, profile `ACTIVE`, role nếu cần. Không có truy cập nội dung social cho khách.
+- `social-api` yêu cầu user JWT; sau khi xác thực, kiểm tra email OU **đã xác minh**, profile `ACTIVE`, role nếu cần. Guest chỉ có exception `public-feed.listPosts` bên dưới, không gọi protected actions.
 - Response dạng `{ "data": ... , "error": null, "meta": { "requestId": "..." } }` hoặc `{ "data": null, "error": { "code": "...", "message": "...", "details": null }, "meta": {...} }`.
 - Date string ISO 8601 UTC, UUID string; API `camelCase`, DB `snake_case`; không trả raw DB row.
 - Validate cả frontend và server; server là nguồn xác thực cuối cùng.
 
 ### Mã lỗi chuẩn
+
+**Public guest feed — Phase A local, Cloud NOT TESTED:** POST `/functions/v1/public-feed` với `{action:'listPosts',payload:{sort:'NEW'|'HOT',tag:null|PostTag,cursor:null|string,limit:1..20}}`; dùng publishable apikey, không cần user JWT. OPTIONS/CORS theo origins được duyệt; không hỗ trợ action khác (400), method khác400, payload/body stream quá16KiB400; config/query lỗi500 an toàn. Same response envelope/Page<PostPublic>; **items chỉ từ exact owner-approved IDs còn PUBLISHED/ANONYMOUS**, không tự áp dụng cho mọi bài. Guest fields: displayMode=ANONYMOUS, authorLabel=OUer ẩn danh, contactUrl=null, images=[], isMine=false, hasUpvoted=false; counters không cá nhân. Không author IDs/nickname/Storage paths/URLs. Public cursor HMAC15phút tách secret/namespace/scope khỏi member, reset khi scope/filter đổi. Empty scope trả items[]/nextCursor=null; malformed config fail closed. Query select tối thiểu và recheck visibility, no-store. getPost/comments/votes/create/publish/delete/media/profile/admin chỉ có trên `social-api` với JWT/authorization như cũ. Invalid JWT gửi tới public endpoint không nâng quyền, chỉ nhận cùng public scope.
 
 | Code | Ý nghĩa | Hành vi UI |
 |---|---|---|
