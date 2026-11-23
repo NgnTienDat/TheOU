@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, useSyncExterna
 import { useQueryClient } from '@tanstack/react-query'
 import { getSupabaseClient } from '../../shared/lib/supabase.ts'
 import { createSocialApi } from '../../shared/api/social-api.ts'
+import { createPublicFeed } from '../../shared/api/public-feed.ts'
+import { readSupabaseEnv } from '../../shared/lib/env.ts'
 import { createAuthService } from './auth-service.ts'
 import { createSessionController } from './session-controller.ts'
 import { clearPending, readPending, savePending, type PendingVerification } from './pending-verification.ts'
@@ -12,7 +14,8 @@ function useAuthRuntime() {
     const client = getSupabaseClient()
     const auth = createAuthService(client)
     const api = createSocialApi(client)
-    return { client, auth, api, controller: createSessionController(auth, api, cache) }
+    const env = readSupabaseEnv(import.meta.env)
+    return { client, auth, api, publicApi: createPublicFeed(env.url, env.publishableKey), controller: createSessionController(auth, api, cache) }
   })
   const state = useSyncExternalStore(runtime.controller.subscribe, runtime.controller.getSnapshot)
   const scope = runtime.controller.getScope()
@@ -32,7 +35,7 @@ function useAuthRuntime() {
     setPendingState(value)
     try { if (value) savePending(sessionStorage, value); else clearPending(sessionStorage) } catch { /* Không phụ thuộc storage để xác thực. */ }
   }
-  return { auth: runtime.auth, controller: runtime.controller, api, scope, state, pending, setPending, notice, notify }
+  return { auth: runtime.auth, controller: runtime.controller, api, publicApi: runtime.publicApi, scope, state, pending, setPending, notice, notify }
 }
 const AuthContext = createContext<ReturnType<typeof useAuthRuntime> | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {

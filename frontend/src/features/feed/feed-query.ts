@@ -2,10 +2,10 @@ import { CancelledError, infiniteQueryOptions, type QueryClient } from '@tanstac
 import type { ListPostsInput, Page, PostPublic, SocialApiClient } from '../../shared/api/SocialApiClient.ts'
 
 export type FeedFilter = Pick<ListPostsInput, 'sort' | 'tag'>
-export const feedKey = (scope: number, filter: FeedFilter) => ['posts', scope, filter.sort, filter.tag] as const
-export function feedOptions(api: Pick<SocialApiClient, 'listPosts'>, scope: number, filter: FeedFilter, isCurrent: () => boolean, reject: (error: unknown) => void) {
+export const feedKey = (scope: number, filter: FeedFilter, guest = false) => [guest ? 'guest-posts' : 'posts', scope, filter.sort, filter.tag] as const
+export function feedOptions(api: Pick<SocialApiClient, 'listPosts'>, scope: number, filter: FeedFilter, isCurrent: () => boolean, reject: (error: unknown) => void, guest = false) {
   return infiniteQueryOptions({
-    queryKey: feedKey(scope, filter), initialPageParam: null as string | null,
+    queryKey: feedKey(scope, filter, guest), initialPageParam: null as string | null,
     queryFn: async ({ pageParam, signal }) => {
       try {
         const page = await api.listPosts({ ...filter, cursor: pageParam, limit: 20 })
@@ -27,6 +27,6 @@ export function uniquePosts(pages: Page<PostPublic>[] = []) {
     seen.add(post.id); return true
   })
 }
-export async function resetFeed(cache: QueryClient, scope: number, filter: FeedFilter) {
-  await cache.resetQueries({ queryKey: feedKey(scope, filter), exact: true })
+export async function resetFeed(cache: QueryClient, scope: number, filter: FeedFilter, guest = false) {
+  await cache.resetQueries({ queryKey: feedKey(scope, filter, guest), exact: true })
 }

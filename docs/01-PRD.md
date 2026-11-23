@@ -1,5 +1,9 @@
 # 01 — Tài liệu yêu cầu sản phẩm (PRD)
 
+## Bổ sung 23/11/2026 — Guest read-only feed (Phase A local)
+
+Theo yêu cầu owner, `/` là Feed cho guest và member; `/bang-tin` redirect về `/`, không Landing Page. Guest chỉ đọc danh sách NEW/HOT/tag/pages của bài **ANONYMOUS + PUBLISHED + ID được owner duyệt công khai**. Mặc định scope rỗng; không tự public bài cũ hoặc bài mới. Guest không có ảnh/signed URLs/contact/nickname, không mở Detail/thread, không tương tác/tạo nội dung/profile/admin. CTA đăng nhập vẫn dùng Auth OU hiện tại. Chưa nghiệm thu Cloud; mọi quy tắc Auth cho thành viên giữ nguyên. Không thay eligibility `@ou.edu.vn`. Xem [báo cáo Phase A](reports/PUBLIC-GUEST-FEED-LOCAL.md).
+
 **Dự án:** TheOU  
 **Phiên bản:** 1.1
 
@@ -95,7 +99,7 @@ Không: kết bạn/follow, chat, thông báo realtime, gửi email sự kiện,
 3. B đăng nhập → đọc bài A → upvote → bình luận.
 4. A trở lại → trả lời bình luận; B chỉ nhìn thấy `Chủ bài`, không thể suy ra email/MSSV/user UUID qua response API.
 5. Bài mới xuất hiện ở `Mới nhất`, bài trong 24h xuất hiện ở `Nổi bật` theo quy tắc.
-6. Đăng được bài 1–2 ảnh, hiển thị được ảnh; người không đăng nhập không lấy được nội dung qua public API.
+6. Thành viên đăng/xem bài1–2ảnh; guest chỉ lấy text/counters từ danh sách được duyệt qua `public-feed`, không lấy Detail hoặc ảnh qua protected API.
 7. Admin ẩn/gỡ bài hoặc bình luận vi phạm; nội dung biến mất khỏi feed/comment của người dùng thường.
 8. Test bảo mật quyền truy cập, danh tính ẩn danh và ít nhất các trường hợp lỗi trọng yếu đều đạt.
 

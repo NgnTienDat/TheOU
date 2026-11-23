@@ -19,8 +19,8 @@ export function AppFrame({ children }: { children?: ReactNode }) {
       <Link className="mini-brand rail-logo" aria-label="TheOU — Bảng tin" to="/">{brand}</Link>
       <nav className="social-nav" aria-label="Điều hướng chính">
         <Link className="nav-item" aria-label="Bảng tin" title="Bảng tin" aria-current={pathname === '/' || (pathname.startsWith('/bai-viet/') && pathname !== '/bai-viet/moi') ? 'page' : undefined} to="/"><Icon name="home" /></Link>
-        <Link className="nav-item nav-create" aria-label="Viết bài" title="Viết bài" aria-current={pathname === '/bai-viet/moi' ? 'page' : undefined} to="/bai-viet/moi"><Icon name="plus" /></Link>
-        <Link className="nav-item nav-profile" aria-label="Cá nhân" title="Cá nhân" aria-current={pathname === '/ca-nhan' ? 'page' : undefined} to="/ca-nhan"><Icon name="user" /></Link>
+        <Link className="nav-item nav-create" aria-label="Viết bài" title="Viết bài" aria-current={pathname === '/bai-viet/moi' ? 'page' : undefined} to={state.phase === 'ready' ? '/bai-viet/moi' : '/dang-nhap'}><Icon name="plus" /></Link>
+        {state.phase === 'ready' ? <Link className="nav-item nav-profile" aria-label="Cá nhân" title="Cá nhân" aria-current={pathname === '/ca-nhan' ? 'page' : undefined} to="/ca-nhan"><Icon name="user" /></Link> : <Link className="nav-item" aria-label="Đăng nhập" title="Đăng nhập" to="/dang-nhap"><Icon name="user" /></Link>}
       </nav>
       <button className="icon-button social-theme" type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển giao diện sáng' : 'Chuyển giao diện tối'} title="Đổi giao diện"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
     </aside>

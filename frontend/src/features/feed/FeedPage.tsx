@@ -4,13 +4,19 @@ import { SocialApiError } from '../../shared/api/social-api.ts'
 import { useFeed } from './useFeed.ts'
 import { PostCard } from './PostCard.tsx'
 import { Icon } from '../../shared/components/Icon.tsx'
+import { useAuth } from '../auth/AuthProvider.tsx'
+import { SessionGate } from '../auth/AuthRoutes.tsx'
 
 export function FeedPage() {
-  const { query, filter, changeFilter, posts, refresh, loadMore } = useFeed()
+  const { query, filter, changeFilter, posts, refresh, loadMore, guest } = useFeed()
+  const { state } = useAuth()
+  if (state.phase !== 'ready' && state.phase !== 'guest') return <SessionGate />
+  const writePath = guest ? '/dang-nhap' : '/bai-viet/moi'
   const cursorError = query.error instanceof SocialApiError && query.error.code === 'VALIDATION_ERROR'
   return <>
     <header className="page-header feed-header"><div className="brand-word" aria-hidden="true">theou<span>.</span></div><h1 className="sr-only">Bảng tin</h1><button className="icon-button refresh-button" aria-label="Làm mới bảng tin" type="button" disabled={query.isFetching} onClick={() => void refresh()}><Icon name="refresh" /></button></header>
-    <div className="feed-heading"><div><div className="intro-mini">CHUYỆN CỦA OU, NGƯỜI OU CÙNG BÀN</div><h2>Hôm nay OU có chuyện gì?</h2><p className="social-lede">Góc nhỏ dành cho những câu chuyện đáng kể.</p></div><Link className="icon-button quick-write" to="/bai-viet/moi" aria-label="Viết bài mới" title="Viết bài mới"><Icon name="pen" /></Link></div>
+    <div className="feed-heading"><div><div className="intro-mini">CHUYỆN CỦA OU, NGƯỜI OU CÙNG BÀN</div><h2>Hôm nay OU có chuyện gì?</h2><p className="social-lede">Góc nhỏ dành cho những câu chuyện đáng kể.</p></div><Link className="icon-button quick-write" to={writePath} aria-label="Viết bài mới" title="Viết bài mới"><Icon name="pen" /></Link></div>
+    {guest && <p className="social-lede"><Link className="ghost" to="/dang-nhap">Đăng nhập để tương tác</Link></p>}
     <section className="feed-controls" aria-label="Bộ lọc bảng tin">
       <div className="feed-tabs" role="group" aria-label="Sắp xếp bài viết">{(['NEW', 'HOT'] as const).map(sort => <button type="button" key={sort} aria-pressed={filter.sort === sort} onClick={() => changeFilter({ ...filter, sort })}>{sort === 'NEW' ? 'Mới nhất' : 'Nổi bật 24h'}</button>)}</div>
       <div className="tag-filters" role="group" aria-label="Chủ đề bài viết">{tagFilters.map(tag => <button type="button" key={tag.value ?? 'ALL'} aria-pressed={filter.tag === tag.value} onClick={() => changeFilter({ ...filter, tag: tag.value })}>{tag.label}</button>)}</div>
@@ -18,8 +24,8 @@ export function FeedPage() {
     <div className="feed-list" aria-label="Danh sách bài viết" aria-busy={query.isPending}>
       {query.isPending ? <div role="status" aria-label="Đang tải bảng tin" className="feed-skeletons">{[1, 2, 3].map(i => <div className="card skeleton-card" key={i} aria-hidden="true"><div className="skeleton-line short" /><div className="skeleton-line" /><div className="skeleton-line" /><div className="skeleton-line medium" /></div>)}</div>
         : !posts.length && query.isError ? <div className="card feed-state" role="alert"><h2>Không tải được bảng tin</h2><p>{cursorError ? 'Liên kết phân trang không còn hợp lệ. Hãy làm mới bảng tin.' : 'Kiểm tra kết nối và thử lại nhé.'}</p><button className="ghost" type="button" onClick={() => void refresh()}>{cursorError ? 'Làm mới bảng tin' : 'Thử lại'}</button></div>
-          : !posts.length ? <div className="card feed-state"><div className="empty-symbol" aria-hidden="true">☁</div><h2>Chưa có bài viết nào. Hãy mở đầu câu chuyện!</h2><p>Một lời chia sẻ nhỏ cũng có thể giúp một OUer khác.</p><Link className="ghost" to="/bai-viet/moi">Viết bài đầu tiên</Link></div>
-            : posts.map(post => <PostCard key={post.id} post={post} detailLink />)}
+          : !posts.length ? <div className="card feed-state"><div className="empty-symbol" aria-hidden="true">☁</div><h2>{guest ? 'Chưa có bài viết công khai.' : 'Chưa có bài viết nào. Hãy mở đầu câu chuyện!'}</h2><p>{guest ? 'Đăng nhập để xem bảng tin dành cho thành viên OU.' : 'Một lời chia sẻ nhỏ cũng có thể giúp một OUer khác.'}</p><Link className="ghost" to={writePath}>{guest ? 'Đăng nhập' : 'Viết bài đầu tiên'}</Link></div>
+            : posts.map(post => <PostCard key={post.id} post={post} detailLink={!guest} readOnly={guest} />)}
     </div>
     {!!posts.length && <div className="feed-pagination">
       {query.isError && <p role="alert">{cursorError ? 'Phiên phân trang không còn hợp lệ. Làm mới bảng tin để tiếp tục.' : 'Không tải được trang tiếp theo. Bạn có thể thử lại.'}</p>}

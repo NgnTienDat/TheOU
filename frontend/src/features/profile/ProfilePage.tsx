@@ -1,12 +1,14 @@
 import { useTask } from '../auth/use-task.ts'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { flushSync } from 'react-dom'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { Alert, Field, Submit } from '../auth/components.tsx'
 import { nicknameError } from '../auth/validation.ts'
 
 export function ProfilePage() {
   const { state, controller, api, notify, setPending } = useAuth()
+  const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
   const [nickname, setNickname] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -38,6 +40,11 @@ export function ProfilePage() {
       <div className="action-row"><Submit busy={task.busy}>Lưu biệt danh</Submit><button type="button" className="ghost" disabled={task.busy} onClick={() => { setEditing(false); task.setError('') }}>Hủy</button></div>
     </form>}
     <div className="divider" />
-    <button type="button" className="logout" disabled={task.busy} onClick={() => void task.run(async () => { setPending(null); await controller.logout(); notify('Đã đăng xuất.') })}>Đăng xuất</button>
+    <button type="button" className="logout" disabled={task.busy} onClick={() => void task.run(async () => {
+      setPending(null)
+      // Commit route public trước Auth callback để protected gate không chuyển nhầm sang login.
+      flushSync(() => navigate('/', { replace: true }))
+      await controller.logout(); notify('Đã đăng xuất.')
+    })}>Đăng xuất</button>
   </section></>
 }

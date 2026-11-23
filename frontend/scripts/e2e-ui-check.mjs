@@ -41,6 +41,9 @@ try {
     let admin = false, sequence = 1, lostCommentAck = true, pixels
     const old = { id: id(sequence++), owner: 1, body: 'Bài cũ tổng hợp ngoài cửa sổ HOT.', tag: 'REVIEW_MON', status: 'PUBLISHED', publishedAt: new Date(Date.now() - 172800000).toISOString() }
     posts.set(old.id, old)
+    const guestRows = [{ ...old, id: id(700), body: 'Nội dung tổng hợp đã duyệt công khai.', publishedAt: new Date(Date.now() - 1000).toISOString() },
+      { ...old, id: id(701), body: 'Nội dung công khai cũ tổng hợp.' }]
+    const guestCalls = []
     const visibleComments = postId => [...comments.values()].filter(c => c.postId === postId && c.status === 'VISIBLE')
     const dto = (post, actor) => ({ id: post.id, tag: post.tag, body: post.body, displayMode: 'ANONYMOUS', authorLabel: 'OUer ẩn danh', contactUrl: null,
       publishedAt: post.publishedAt, upvoteCount: Number(votes.has(post.id)), commentCount: visibleComments(post.id).length,
@@ -83,6 +86,15 @@ try {
             assert.notEqual(contextActor, null)
             body = users[contextActor]
           } else if (url.pathname.endsWith('/logout')) body = {}
+          else if (url.pathname.endsWith('/public-feed')) {
+            assert.equal(req.headers().authorization, undefined)
+            assert.equal(input.action, 'listPosts')
+            const p = input.payload
+            guestCalls.push(p)
+            const rows = guestRows.filter(row => (!p.tag || row.tag === p.tag) && (p.sort !== 'HOT' || Date.parse(row.publishedAt) >= Date.now() - 86400000))
+            const offset = p.cursor ? 1 : 0
+            body = envelope({ items: rows.slice(offset, offset + 1).map(row => ({ ...dto(row, null), isMine: false, hasUpvoted: false, images: [] })), nextCursor: rows.length > offset + 1 ? 'guest-next' : null })
+          }
           else if (url.pathname.endsWith('/social-api')) {
             const actor = sessions.findIndex(session => req.headers().authorization === `Bearer ${session.access_token}`)
             if (actor < 0) deny('UNAUTHENTICATED', 401)
@@ -161,7 +173,7 @@ try {
         await page.screenshot({ path: join(artifacts, `${name}-${width}-${theme}.png`), fullPage: true, style: '.toast{visibility:hidden}' }); shots++
       }
       const login = async (page, actor) => {
-        await page.goto(origin); await page.waitForURL('**/dang-nhap')
+        await page.goto(origin + '/dang-nhap'); await page.waitForURL('**/dang-nhap')
         await page.getByLabel('Email trường', { exact: true }).fill(users[actor].email)
         await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!')
         await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
@@ -184,14 +196,31 @@ try {
         await a.waitForURL(origin + '/')
         return [...posts.values()].at(-1)
       }
-      await guest.goto(origin); await guest.waitForURL('**/dang-nhap')
-      assert.equal(calls.length, 0, 'Khách không gửi business API')
+      await guest.goto(origin + '/bang-tin'); await guest.getByRole('link', { name: 'Đăng nhập để tương tác', exact: true }).waitFor()
+      await guest.getByText(guestRows[0].body, { exact: true }).waitFor()
+      assert.equal(new URL(guest.url()).pathname, '/')
+      assert.equal(calls.length, 0, 'Khách không gửi protected business API')
+      assert.equal(await guest.locator('.upvote-button,.post-images,.post-share').count(), 0)
+      assert.equal(await guest.getByRole('link', { name: 'Cá nhân', exact: true }).count(), 0)
+      assert.equal(await guest.getByRole('link', { name: 'Mở bài viết và bình luận', exact: true }).count(), 0)
+      await guest.getByRole('button', { name: 'Tải thêm', exact: true }).click()
+      await guest.getByText(guestRows[1].body, { exact: true }).waitFor()
+      assert.equal(guestCalls.at(-1).cursor, 'guest-next')
+      await guest.getByRole('button', { name: 'Nổi bật 24h', exact: true }).click()
+      await guest.waitForFunction(() => document.querySelectorAll('.post-card').length === 1)
+      await guest.getByRole('button', { name: 'Hỏi gấp', exact: true }).click()
+      await guest.getByRole('heading', { name: 'Chưa có bài viết công khai.', exact: true }).waitFor()
+      await guest.getByRole('link', { name: 'Viết bài', exact: true }).click(); await guest.waitForURL('**/dang-nhap')
+      for (const path of ['/bai-viet/moi', `/bai-viet/${old.id}`, '/ca-nhan', '/admin']) {
+        await guest.goto(origin + path); await guest.waitForURL('**/dang-nhap')
+      }
       const denied = await guest.evaluate(async endpoint => {
         const res = await fetch(`${endpoint}/functions/v1/social-api`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'listPosts', payload: { sort: 'NEW', tag: null, cursor: null, limit: 20 } }) })
         return res.status
       }, endpoint)
       assert.equal(denied, 401)
-      await shot(guest, 'guest-login')
+      await guest.goto(origin); await guest.getByText(guestRows[0].body, { exact: true }).waitFor()
+      await shot(guest, 'guest-feed')
       await login(a, 0); const first = await publish(1)
       assert.equal([...images.values()].filter(image => image.postId === first.id && image.ready).length, 1)
       await a.reload(); await a.locator('.post-card').first().waitFor()
@@ -274,9 +303,10 @@ try {
       await shot(a, 'a-hidden-not-found')
       admin = false; await b.goto(origin + '/admin'); await b.reload()
       await b.getByRole('heading', { name: 'Không có quyền kiểm duyệt' }).waitFor()
-      await a.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await a.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await a.waitForURL('**/dang-nhap')
+      await a.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await a.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await a.waitForURL(origin + '/')
+      await a.getByText(guestRows[0].body, { exact: true }).waitFor()
       await b.goto(origin); await b.getByRole('heading', { name: 'Bảng tin', exact: true }).waitFor()
-      assert.equal(await guest.locator('.post-card').count(), 0)
+      assert.equal(await guest.locator('.post-card').count(), 1)
       assert.equal(calls.filter(c => c.action === 'createPost').length, 2)
       assert.deepEqual(runtimeErrors, []); assert.deepEqual(blocked, [])
       console.log(`PASS: cross-context React E2E ${width}/${theme}; A/B/guest isolated, media1/2, OP, vote/count, lost ACK, NEW/HOT/pages, delete/hide, mock audits, logout isolation.`)

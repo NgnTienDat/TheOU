@@ -430,3 +430,9 @@ enabled = true
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/social-api/index.ts"
+
+# Chỉ listPosts từ allowlist owner duyệt; social-api vẫn verify_jwt=true.
+[functions.public-feed]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/public-feed/index.ts"

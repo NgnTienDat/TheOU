@@ -1,5 +1,9 @@
 # 04 — Kiến trúc và quyết định kỹ thuật
 
+## Bổ sung public-feed — local Phase A, 23/11/2026
+
+Guest → API adapter `public-feed` (POST listPosts, publishable apikey, không Authorization/cookies) → Edge riêng `verify_jwt=false`. Member → `social-api` giữ `verify_jwt=true` + Auth server/ACTIVE/owner/role guards. Không client raw-table access. Public handler không gọi Auth/profiles/roles/votes/Storage, không provision profile; chỉ SELECT posts trong exact allowlist server, PUBLISHED/ANONYMOUS và recheck visibility trước response. Shared `queryPostPage` giữ cùng NEW/HOT24h tuple/cursor validation/page limit; public select tối thiểu không author/media fields. DTO allowlist guest luôn anonymous, contact=null/images=[], flags=false. Cache root `guest-posts` tách `posts`, session epoch/late-response guards giữ nguyên. No-store không đảm bảo thu hồi nội dung đã bị copy. Chưa deploy/Cloud PASS; xem [Phase A](reports/PUBLIC-GUEST-FEED-LOCAL.md).
+
 ## 1. Mục tiêu kiến trúc
 
 Đủ nhanh để hoàn thành **Prototype trong 2 tuần**, đồng thời giữ ranh giới giữa UI và nghiệp vụ để sau này có thể thay Edge Functions bằng NestJS mà **không đổi cơ sở dữ liệu hoặc giao diện đồng loạt**.

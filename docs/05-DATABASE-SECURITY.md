@@ -1,5 +1,11 @@
 # 05 — Thiết kế Database, danh tính ẩn danh và bảo mật
 
+## Public guest feed exception — Phase A local, 23/11/2026
+
+Chỉ `public-feed.listPosts` được đọc không JWT; protected `social-api` không đổi. `THEOU_PUBLIC_FEED_POST_IDS` là allowlist **server**, mặc định rỗng/max100UUID, owner phải review nội dung/consent trước khi thêm từng ID. Còn phải PUBLISHED/ANONYMOUS; nickname/contact/media không được đọc hoặc trả cho guest. Không thay grants/RLS/service-role policy, không migration, không tự bật public cho nội dung cũ. Client anon/authenticated vẫn bị từ chối raw business tables/RPC. Public handler không có DML/Auth/profile/media actions.
+
+Secret cursor guest riêng + namespace và hash scope vô hiệu cursors khi scope thay đổi; không dùng cursor member sang guest. CORS không phải authorization. Body text có thể chứa PII do người đăng tự viết; DTO filtering không làm sạch nội dung đó, do vậy owner review explicit scope bắt buộc. Empty allowlist là kill switch nhưng không thu hồi bản đã đọc/copy, không chứng minh purge cache bên ngoài. Public traffic/abuse/rate limit cần review trước Cloud; không nhận request-size/page-limit là rate limiter. Nếu cần consent bền vững, public/private per-row hoặc scope lớn hơn, dừng để đề xuất migration riêng trước implementation tiếp theo.
+
 Đây là **đặc tả thiết kế**; phần schema T02 đã có migration và test quyền được phép/bị từ chối, đã triển khai lên Cloud. RLS và grants là cổng an toàn; các Edge Functions dùng secret/admin vẫn phải tự kiểm tra quyền vì có thể bypass RLS.
 
 **T02 — COMPLETED (15/11/2026):** migration `supabase/migrations/20261113170214_t02_schema_security.sql` đã áp dụng trên TheOU-dev; catalog đạt, offline 22/22 PASS, Cloud 8/8 PASS theo xác nhận chủ dự án và cleanup đã xác minh read-only. Timestamp tên file do CLI sinh theo UTC. Xem [báo cáo nghiệm thu](reports/T02-STATUS-REPORT.md); các phần nghiệp vụ/API bên dưới vẫn thuộc task tiếp theo.
@@ -193,7 +199,7 @@ Remove retry giữ REMOVING khi Storage lỗi và cấm publish; exact path dele
 
 | Tác vụ | Khách | Thành viên ACTIVE | Chủ nội dung | Admin |
 |---|---:|---:|---:|---:|
-| Đọc feed | ❌ | ✅ | ✅ | ✅ |
+| Đọc feed | Chỉ guest allowlist PUBLISHED/ANONYMOUS, không ảnh | ✅ | ✅ | ✅ |
 | Tạo bài/comment/vote | ❌ | ✅ | ✅ | ✅ |
 | Xóa bài/comment của A | ❌ | ❌ | ✅ (A) | ✅ (ẩn/gỡ) |
 | Xem identity của tác giả ẩn danh | ❌ | ❌ | Chính bản thân với dữ liệu `/me` | Có điều kiện, log audit |

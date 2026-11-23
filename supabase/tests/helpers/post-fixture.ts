@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { createClient } from '@supabase/supabase-js'
 import { createSocialApiHandler } from '../../functions/social-api/handler.ts'
-import { postColumns } from '../../functions/social-api/modules/posts/post-mapper.ts'
+import { guestPostColumns, postColumns } from '../../functions/social-api/modules/posts/post-mapper.ts'
 
 export const a = '00000000-0000-4000-8000-000000000001'
 export const b = '00000000-0000-4000-8000-000000000002'
@@ -219,7 +219,7 @@ export async function postFixture() {
       const params: unknown[] = []
       const where: string[] = []
       const add = (sql: string, value: unknown) => { params.push(value); where.push(sql.replace('?', `$${params.length}`)) }
-      for (const name of ['id','author_id','idempotency_key','status','tag']) if (filter(url, name) && !url.searchParams.get(name)?.startsWith('in.')) add(`p.${name}=?`, filter(url, name))
+      for (const name of ['id','author_id','idempotency_key','status','tag','display_mode']) if (filter(url, name) && !url.searchParams.get(name)?.startsWith('in.')) add(`p.${name}=?`, filter(url, name))
       if (url.searchParams.get('id')?.startsWith('in.')) add('p.id=any(?::uuid[])',url.searchParams.get('id')!.slice(4,-1).split(','))
       for (const value of url.searchParams.getAll('published_at')) {
         assert.match(value, /^(lte|gte)\./)
@@ -241,12 +241,12 @@ export async function postFixture() {
           : `(p.upvote_count,p.published_at,p.id)<($${offset+1}::integer,$${offset+2}::timestamptz,$${offset+3}::uuid)`)
       }
       const select = url.searchParams.get('select')
-      assert.ok(select === 'id' || select === postColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id' || select === 'id,author_id,status')
+      assert.ok(select === 'id' || select === postColumns || select === guestPostColumns || select === 'id,body,tag,display_mode,contact_url' || select === 'id,author_id' || select === 'id,author_id,status')
       const order = url.searchParams.get('order')
       if (order) assert.ok(['published_at.desc,id.desc','upvote_count.desc,published_at.desc,id.desc'].includes(order))
       const limit = url.searchParams.get('limit')
       if (limit) assert.ok(Number.isInteger(Number(limit)) && Number(limit) >= 2 && Number(limit) <= 21)
-      const result = await db.query<Record<string,unknown>>(`select ${select === 'id' ? 'p.id' : select === postColumns ? columns : select === 'id,author_id' ? 'p.id,p.author_id' : select === 'id,author_id,status' ? 'p.id,p.author_id,p.status' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
+      const result = await db.query<Record<string,unknown>>(`select ${select === 'id' ? 'p.id' : select === postColumns ? columns : select === guestPostColumns ? guestPostColumns.split(',').map(c=>c==='published_at'?'p.published_at::text':'p.'+c).join(',') : select === 'id,author_id' ? 'p.id,p.author_id' : select === 'id,author_id,status' ? 'p.id,p.author_id,p.status' : 'p.id,p.body,p.tag,p.display_mode,p.contact_url'} from posts p
         ${where.length ? `where ${where.join(' and ')}` : ''}
         ${order ? `order by ${order.split(',').map(value => 'p.'+value.replace('.', ' ')).join(',')}` : ''} ${limit ? `limit ${Number(limit)}` : ''}`, params)
       return Response.json(result.rows.map(row => row.published_at ? { ...row, published_at: iso(row.published_at as string) } : row))
@@ -263,7 +263,7 @@ export async function postFixture() {
   const handler = createSocialApiHandler({ createAuthClient: () => client('sb_publishable_offline'),
     createAdminClient: () => client(serverKey), allowedOrigins: [origin], readCursorSecret: () => state.secret, now: () => state.now })
   return {
-    db, state, calls, votes, storage, handler,
+    db, state, calls, votes, storage, handler, adminClient: client(serverKey),
     request(action: string, payload: unknown, caller: string | null = a, extra: Record<string,string> = {}, signal?: AbortSignal) {
       return new Request('https://offline.example.invalid/functions/v1/social-api', { method: 'POST',
         headers: { 'content-type':'application/json', origin, ...(caller ? { authorization:`Bearer ${token(caller)}` } : {}), ...extra },

@@ -48,6 +48,7 @@ try {
     if (url.pathname.endsWith('/token')) body = sessions[users.findIndex(user => user.email === input.email)]
     else if (url.pathname.endsWith('/user')) { assert.ok(caller >= 0); body = users[caller] }
     else if (url.pathname.endsWith('/logout')) body = {}
+    else if (url.pathname.endsWith('/public-feed')) { assert.equal(request.headers()['authorization'], undefined); body = envelope({ items: [], nextCursor: null }) }
     else if (url.pathname.endsWith('/social-api')) {
       assert.ok(caller >= 0, 'API gắn token đúng caller')
       if (input.action === 'getMe') body = envelope({ nickname: 'OUer offline', emailMasked: '***@ou.edu.vn', isAdmin: false })
@@ -83,6 +84,7 @@ try {
     }, { pressed, count })
   }
   async function login(caller = 0) {
+    if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap')
     await page.getByLabel('Email trường', { exact: true }).fill(users[caller].email)
     await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!')
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
@@ -109,7 +111,7 @@ try {
   }
   async function back() { await page.getByRole('link', { name: 'Bảng tin', exact: true }).click(); await button().waitFor() }
   await mkdir(artifacts, { recursive: true })
-  await page.goto(origin); await page.waitForURL('**/dang-nhap'); await login(); await state(false, 3)
+  await page.goto(origin + '/dang-nhap'); await page.waitForURL('**/dang-nhap'); await login(); await state(false, 3)
   for (const width of [360, 390, 768, 1280]) for (const theme of ['dark', 'light']) await shot('feed-outline', width, theme)
 
   mode = 'hold'; held = false; const before = calls.length
@@ -163,7 +165,8 @@ try {
 
   mode = 'hold401'; held = false; await button().click(); await waitHeld()
   await page.getByRole('link', { name: 'Cá nhân', exact: true }).click()
-  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('**/dang-nhap')
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
+  await page.waitForURL(origin + '/')
   mode = 'ready'; await login(1); await state(false, 4)
   release(); await page.waitForTimeout(100)
   assert.equal(new URL(page.url()).pathname, '/', '401 phiên cũ không logout phiên B')
