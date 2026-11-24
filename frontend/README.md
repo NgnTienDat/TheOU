@@ -89,6 +89,8 @@ Composer xử lý JPG/PNG/WebP bằng canvas, tối đa2 ảnh, ≤2MiB/ảnh sa
 
 Gallery Feed/Detail dùng PublicImage signed URL300giây, placeholder/error/expiry và tải lại tối đa3lần/mount; không public URL fallback hoặc log URL. Timeout upload30giây có thể là unknown commit; retry finalize trước, cùng post/key/blob, không upsert. Sau bắt đầu publish không đổi attachments.
 
+Refinement gallery24/11/2026: các ảnh nằm cạnh nhau trong horizontal scroll, không arrows/counter; khi bài vào vùng gần viewport200px thì tải toàn bộ tối đa2ảnh. Desktop kéo chuột trái/trackpad hoặc ArrowLeft/Right/Home/End; mobile dùng swipe native, giữ cuộn dọc/zoom. Ngưỡng drag6px ngăn click nhầm sang Detail. Frame dùng natural dimensions từng ảnh, không upscale/crop/letterbox; max-height320px desktop/280px mobile, max-width cột bài, radius12px/gap8px. DTO chưa có dimensions nên lần tải đầu vẫn có thể thay đổi chiều cao; đã biết kích thước thì giữ frame qua refresh/error. Lazy/viewport chỉ điều khiển tải ảnh, không thay Auth/Storage/DTO. Xem [báo cáo gallery](../docs/reports/POST-IMAGE-GALLERY-REFINEMENT.md).
+
 `npm.cmd run test:ui:media` chạy Edge/Playwright với Auth/API/Storage giả, chặn mạng ngoài host local/offline; ảnh tại `node_modules/.cache/theou-media-ui/`. Không gọi Cloud. Chạy cùng các scripts Auth/Feed/Comments/Upvote khi review T10. Bucket/migration/deploy chỉ sau review T10-B; xem [báo cáo](../docs/reports/T10-A-IMPLEMENTATION.md).
 
 ## Landing React — 24/11/2026

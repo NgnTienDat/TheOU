@@ -248,21 +248,21 @@ html[data-theme=light] .social-app{--fg:#1c1c1f;--muted:#6d6d73;--faint:#98979c;
 .social-app .draft-image img { width: 100%; height: 120px; object-fit: contain; }
 .social-app .draft-image p { font-size: 12px; overflow-wrap: anywhere; }
 .social-app .draft-image button { width: 100%; min-height: 44px; }
-.social-app .post-images { position: relative; z-index: 2; margin: 12px 0 4px; min-width: 0; outline-offset: 3px; }
-.social-app .post-images:focus-visible { outline: 2px solid var(--ring); border-radius: 16px; }
-.social-app .post-carousel-viewport { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); touch-action: pan-y pinch-zoom; }
-.social-app .post-image-frame { position: relative; display: grid; place-items: center; min-height: 160px; overflow: hidden; background: var(--surface); }
-.social-app .post-image-frame img { display: block; width: 100%; height: auto; max-height: min(540px,70dvh); object-fit: contain; min-height: 0; }
+.social-app .post-images { --post-image-max-height: 320px; position: relative; z-index: 2; margin: 12px 0 4px; min-width: 0; }
+.social-app .post-gallery-track { display: flex; align-items: flex-start; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; min-width: 0; max-width: 100%; touch-action: auto; }
+.social-app .post-gallery-track::-webkit-scrollbar { display: none; }
+.social-app .post-gallery-track:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 12px; }
+.social-app .post-gallery-item { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+.social-app .post-image-frame { position: relative; width: fit-content; max-width: 100%; overflow: hidden; border-radius: 12px; background: var(--surface); }
+.social-app .post-image-frame img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
 .social-app .post-image-link { display: block; color: inherit; text-decoration: none; }
-.social-app .post-image-link:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; }
-.social-app .carousel-counter { position: absolute; top: 10px; right: 10px; padding: 5px 9px; border-radius: 999px; color: #fff; background: #000b; font-size: 11px; font-variant-numeric: tabular-nums; pointer-events: none; }
-.social-app .post-card .carousel-control { position: absolute; z-index: 4; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; padding: 12px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--fg); background: var(--panel); opacity: .9; }
-.social-app .carousel-previous { left: 8px; }.social-app .carousel-next { right: 8px; }
-.social-app .carousel-previous svg { transform: rotate(90deg); }.social-app .carousel-next svg { transform: rotate(-90deg); }
-.social-app .carousel-control:disabled { visibility: hidden; }.social-app .carousel-control:hover:not(:disabled) { opacity: 1; background: var(--surface); }
+.social-app .post-image-link:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; border-radius: 12px; }
+.social-app .post-gallery-track[data-multiple=true], .social-app .post-gallery-track[data-multiple=true] .post-image-link { cursor: grab; }
+.social-app .post-gallery-track[data-dragging=true], .social-app .post-gallery-track[data-dragging=true] .post-image-link { cursor: grabbing; user-select: none; }
 .social-app .post-card-media .post-meta { margin: 5px 0 0; }
-.social-app .post-image-frame p, .social-app .image-placeholder { padding: 8px; font-size: 12px; text-align: center; color: var(--muted); }
-.social-app .image-placeholder { position: absolute; }
+.social-app .post-image-frame p, .social-app .image-placeholder { display: block; min-height: 44px; margin: 0; padding: 8px; font-size: 12px; color: var(--muted); }
+.social-app .post-image-frame .image-failure { position: absolute; inset: 0; min-height: 0; }
+@media(max-width:720px){ .social-app .post-images { --post-image-max-height: 280px; } }
 .social-app .image-picker-label:focus-within { outline: 2px solid var(--fg); outline-offset: 3px; }
 .social-app .image-picker-label:has(input:disabled) { opacity: .55; }
 
