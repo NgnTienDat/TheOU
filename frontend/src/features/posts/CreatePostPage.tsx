@@ -46,7 +46,7 @@ export function CreatePostPage() {
   function update(patch: Partial<PostDraft>) { setDraft(value => changeDraft(value, patch)) }
   const showError = (field: keyof PostDraft) => submitted && errors[field] ? <p id={`error-${field}`} className="error visible" role="alert">{errors[field]}</p> : null
   return <>
-    <header className="page-header composer-heading"><Link className="icon-button" to="/" aria-label="Quay lại bảng tin"><Icon name="back" /></Link><h1>Viết bài</h1><span className="microcopy">Chỉ sinh viên OU</span></header>
+    <header className="page-header composer-heading"><Link className="icon-button" to="/bang-tin" aria-label="Quay lại bảng tin"><Icon name="back" /></Link><h1>Viết bài</h1><span className="microcopy">Chỉ sinh viên OU</span></header>
     <form className="card composer-card" noValidate aria-busy={busy} onSubmit={async event => {
       event.preventDefault(); setSubmitted(true)
       if(busy) return
@@ -60,7 +60,7 @@ export function CreatePostPage() {
       await cache.invalidateQueries({ queryKey: ['posts', scope], refetchType: 'none' })
       cache.removeQueries({ queryKey: ['posts', scope] })
       if (!active.current || controller.getScope() !== scope) return
-      notify('Đã đăng bài. Câu chuyện của bạn đã lên bảng tin.'); navigate('/', { replace: true })
+      notify('Đã đăng bài. Câu chuyện của bạn đã lên bảng tin.'); navigate('/bang-tin', { replace: true })
     }}>
       <Alert message={state.error} />
       <fieldset disabled={busy} className="composer-fields">
@@ -96,7 +96,7 @@ export function CreatePostPage() {
         {allowsContact(draft) && <div className="field"><label className="label" htmlFor="post-contact">Liên kết liên hệ <span className="text-muted">(không bắt buộc)</span></label><input id="post-contact" disabled={state.locked} className="input" type="url" autoComplete="off" placeholder="https://zalo.me/..." value={draft.contactUrl} onChange={e => update({ contactUrl: e.target.value })} aria-invalid={submitted && !!errors.contactUrl} aria-describedby={submitted && errors.contactUrl ? 'error-contactUrl' : undefined} />{showError('contactUrl')}<p className="microcopy">Liên kết này sẽ công khai cùng bài viết.</p></div>}
         </div></fieldset>
       {state.locked && state.phase !== 'success' && <p className="submission-note" role="status">{busy ? state.phase === 'creating' ? 'Đang tạo bản nháp…' : 'Đang hoàn tất đăng bài…' : 'Giữ nguyên nội dung để thử lại an toàn. Không tạo bài mới khi chưa rõ kết quả.'}</p>}
-      <div className="composer-actions"><Link className="ghost" to="/">Hủy</Link><button className="primary" type="submit" disabled={busy || state.phase === 'success'}>{busy ? <><span className="spinner" aria-hidden="true" /> Đang đăng…</> : state.phase === 'failed' ? state.postId ? 'Thử lại hoàn tất đăng bài' : 'Thử lại đăng bài' : 'Đăng bài'}<Icon name="send" /></button></div>
+      <div className="composer-actions"><Link className="ghost" to="/bang-tin">Hủy</Link><button className="primary" type="submit" disabled={busy || state.phase === 'success'}>{busy ? <><span className="spinner" aria-hidden="true" /> Đang đăng…</> : state.phase === 'failed' ? state.postId ? 'Thử lại hoàn tất đăng bài' : 'Thử lại đăng bài' : 'Đăng bài'}<Icon name="send" /></button></div>
       <p className="composer-note">Đừng đưa email, MSSV hoặc thông tin riêng tư vào nội dung. Bài viết chỉ hiển thị sau khi đăng thành công.</p>
     </form>
   </>

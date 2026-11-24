@@ -95,12 +95,12 @@ try {
   async function ready() {
     if (new URL(page.url()).pathname !== '/ca-nhan') {
       await page.getByRole('heading', { name: 'Bảng tin', exact: true }).waitFor()
-      assert.equal(new URL(page.url()).pathname, '/', 'login/OTP/retry chuyển về feed')
+      assert.equal(new URL(page.url()).pathname, '/bang-tin', 'login/OTP/retry chuyển về feed')
       await page.getByRole('link', { name: 'Cá nhân', exact: true }).click()
     }
     await page.waitForSelector('.profile-name')
   }
-  async function logout() { await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('http://127.0.0.1:5188/'); await page.goto('http://127.0.0.1:5188/dang-nhap'); await page.waitForSelector('input[name=email]') }
+  async function logout() { await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('http://127.0.0.1:5188/bang-tin'); await page.goto('http://127.0.0.1:5188/dang-nhap'); await page.waitForSelector('input[name=email]') }
   await page.goto('http://127.0.0.1:5188/ca-nhan')
   await page.waitForURL('**/dang-nhap'); await page.waitForSelector('input[name=email]')
   assert.equal(await page.getAttribute('html', 'data-theme'), 'dark')

@@ -65,7 +65,7 @@ try {
       await page.screenshot({ path: join(artifacts, `${name}-${width}-${theme}.png`), fullPage: true }); shots++
     }
   }
-  const login = async () => { if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap'); await page.getByLabel('Email trường', { exact: true }).fill(user.email); await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!'); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(origin + '/') }
+  const login = async () => { if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap'); await page.getByLabel('Email trường', { exact: true }).fill(user.email); await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!'); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(origin + '/bang-tin') }
   const confirm = async (name, accept = true) => { page.once('dialog', dialog => accept ? dialog.accept() : dialog.dismiss()); await page.getByRole('button', { name, exact: true }).click() }
   await page.goto(origin + '/dang-nhap'); await page.waitForURL('**/dang-nhap'); await login()
   await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).waitFor()
@@ -77,7 +77,7 @@ try {
   assert.doesNotMatch(await page.locator('.social-wrap').innerText(), /PRIVATE|SQL|JWT|offline@|offline-read/)
   mode = ''; await page.getByRole('link', { name: 'Mở bài viết và bình luận', exact: true }).first().click()
   await page.locator('.post-thread').waitFor(); await shot('owner-detail')
-  await confirm('Xóa bài viết'); await page.waitForURL(origin + '/')
+  await confirm('Xóa bài viết'); await page.waitForURL(origin + '/bang-tin')
   await page.waitForFunction(() => document.querySelectorAll('.post-card').length === 1)
   assert.equal(await page.locator('.post-images').count(), 0)
   await page.goto(origin + '/admin'); await page.getByRole('heading', { name: 'Không có quyền kiểm duyệt' }).waitFor()
@@ -103,12 +103,12 @@ try {
   await confirm('Ẩn nội dung'); await page.getByText('Đã ẩn nội dung và ghi lịch sử kiểm duyệt.').waitFor(); await shot('admin-post-success')
   await page.goto(`${origin}/bai-viet/${id(1)}`); await page.getByRole('heading', { name: 'Không tìm thấy bài viết', exact: true }).waitFor()
   // Late Auth error của request cũ không được logout phiên mới.
-  hidden = false; await page.goto(origin); mode = 'hold'; held = false; await confirm('Xóa bài viết')
+  hidden = false; await page.goto(origin + '/bang-tin'); mode = 'hold'; held = false; await confirm('Xóa bài viết')
   for (let n = 0; n < 100 && !held; n++) await page.waitForTimeout(20)
   assert.ok(held); assert.equal(await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).isDisabled(), true)
   const count = calls.length; await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).evaluate(node => { node.click(); node.click() }); assert.equal(calls.length, count)
-  await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/')
-  await login(); mode = ''; release(); await page.waitForTimeout(200); assert.equal(new URL(page.url()).pathname, '/')
+  await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/bang-tin')
+  await login(); mode = ''; release(); await page.waitForTimeout(200); assert.equal(new URL(page.url()).pathname, '/bang-tin')
   assert.deepEqual(errors, [])
   console.log(`PASS: T11 moderation browser offline; ${shots} screenshots, owner delete/cancel/error/pending/navigation/session, admin allow/deny/POST/COMMENT/validation, media/count/privacy,390/1280 dark/light. Không gọi Cloud.`)
 } finally { release?.(); await browser?.close(); server.kill() }

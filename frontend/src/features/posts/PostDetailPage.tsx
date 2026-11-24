@@ -21,7 +21,7 @@ function PostDetail({postId}:{postId:string}) {
   const query=useQuery({...detailOptions(api,scope,postId,()=>controller.getScope()===scope,controller.reject),enabled:!invalid&&!missing})
   const notFound=invalid||missing||(query.error instanceof SocialApiError&&query.error.code==='NOT_FOUND')
   return <div className="card post-thread">
-    <header className="detail-header"><Link className="icon-button detail-back" to="/" aria-label="Quay về bảng tin" title="Quay về bảng tin"><Icon name="back"/></Link><h1>Bài viết</h1></header>
+    <header className="detail-header"><Link className="icon-button detail-back" to="/bang-tin" aria-label="Quay về bảng tin" title="Quay về bảng tin"><Icon name="back"/></Link><h1>Bài viết</h1></header>
     {notFound?<div className="feed-state" role="alert"><h2>Không tìm thấy bài viết</h2><p>Bài viết không còn hiển thị hoặc bạn không được phép xem.</p></div>:query.isPending?<div className="state-message" role="status" aria-busy="true">Đang tải bài viết…</div>:query.isError?<div className="feed-state" role="alert"><h2>Không tải được bài viết</h2><button type="button" className="ghost" onClick={()=>void query.refetch()}>Thử lại</button></div>:<><PostCard post={query.data}/><CommentList key={`${scope}:${postId}`} postId={postId} onMissing={onMissing}/></>}
   </div>
 }

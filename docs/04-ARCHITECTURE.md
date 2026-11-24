@@ -234,3 +234,7 @@ Test đã tái hiện listComments giữ snapshot VISIBLE khi admin hide commit 
 6. Chỉ chuyển auth/storage/database nếu có lý do cụ thể; tránh rewrite không cần thiết.
 
 **Tham khảo chính thức:** https://supabase.com/docs/guides/functions/auth · https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook · https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## Landing React — routing local 24/11/2026
+
+`/` hiển thị Landing độc lập AppFrame; `/bang-tin` hiển thị Feed. Landing dùng AuthProvider hiện có để chọn CTA, không tạo Auth client mới hoặc gọi business API. Demo dữ liệu tĩnh không phải public-feed. Backend, allowlist, JWT, grants/RLS và protected routes không đổi.

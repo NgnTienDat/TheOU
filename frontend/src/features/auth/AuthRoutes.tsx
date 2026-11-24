@@ -13,9 +13,9 @@ export function SessionGate({ protectedRoute = false }: { protectedRoute?: boole
     <Alert message={state.phase === 'blocked' ? 'Tài khoản không đủ điều kiện truy cập TheOU hoặc đã bị khóa.' : 'Không thể tải phiên hoặc hồ sơ. Kiểm tra kết nối và thử lại.'} />
     <Alert message={task.error} />
     <button className="primary" onClick={controller.retry} disabled={task.busy}>Thử lại</button>
-    <button className="logout" onClick={() => void task.run(async () => { flushSync(() => navigate('/', { replace: true })); await controller.logout() })} disabled={task.busy}>Đăng xuất</button>
+    <button className="logout" onClick={() => void task.run(async () => { flushSync(() => navigate('/bang-tin', { replace: true })); await controller.logout() })} disabled={task.busy}>Đăng xuất</button>
   </div>
   if (protectedRoute && state.phase === 'guest') return <Navigate to="/dang-nhap" replace />
-  if (!protectedRoute && state.phase === 'ready') return <Navigate to="/" replace />
+  if (!protectedRoute && state.phase === 'ready') return <Navigate to="/bang-tin" replace />
   return <Outlet />
 }

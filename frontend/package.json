@@ -16,6 +16,7 @@
     "test:ui:media": "node scripts/media-ui-check.mjs",
     "test:ui:moderation": "node scripts/moderation-ui-check.mjs",
     "test:ui:e2e": "node scripts/e2e-ui-check.mjs",
+    "test:ui:landing": "node scripts/landing-ui-check.mjs",
     "preview": "vite preview"
   },
   "engines": {

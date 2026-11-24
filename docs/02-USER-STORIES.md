@@ -1,8 +1,10 @@
 # 02 — User Stories & Tiêu chí nghiệm thu
 
+**Routing hiện hành — 24/11/2026:** `/` là Landing theo `TheOU-Landing-Black-White.html`, luôn hiển thị cho guest/member; `/bang-tin` là Feed. Login/OTP, logout, publish/delete và các nút quay lại Feed dùng `/bang-tin`. Landing demo không gọi API; guest Feed vẫn dùng allowlist server, không mở thêm dữ liệu công khai. Chỉ kiểm local, chưa deploy. Xem [báo cáo Landing](reports/LANDING-REACT-INTEGRATION.md).
+
 ## Bổ sung US-03 — Guest feed, owner yêu cầu 23/11/2026
 
-Phase A local, Cloud NOT TESTED: guest vào `/` không redirect; NEW/HOT/tag/pages chỉ trên allowlist server (mặc định rỗng), PUBLISHED/ANONYMOUS. Không signed URLs, nickname/contact hoặc identity; isMine/hasUpvoted=false. Click viết bài/CTA dẫn `/dang-nhap`; không có link Detail, vote/share/delete hoặc profile/admin nav. Direct protected URLs vẫn qua SessionGate; protected actions vẫn yêu cầu JWT/OU/confirmed/ACTIVE/owner/ADMIN như trước. Login tới `/`; logout tới guest feed, cache/member requests cũ không được lộ sang guest. Member feed giữ phạm vi và nghiệp vụ hiện hành. Không auto-public toàn PUBLISHED. Đây là extension có chủ đích, không sửa các PASS/evidence lịch sử.
+Phase A local, Cloud NOT TESTED: guest đọc Feed tại `/bang-tin`, `/` hiển thị Landing; NEW/HOT/tag/pages chỉ trên allowlist server (mặc định rỗng), PUBLISHED/ANONYMOUS. Không signed URLs, nickname/contact hoặc identity; isMine/hasUpvoted=false. Click viết bài/CTA dẫn `/dang-nhap`; không có link Detail, vote/share/delete hoặc profile/admin nav. Direct protected URLs vẫn qua SessionGate; protected actions vẫn yêu cầu JWT/OU/confirmed/ACTIVE/owner/ADMIN như trước. Login tới `/bang-tin`; logout tới guest feed, cache/member requests cũ không được lộ sang guest. Member feed giữ phạm vi và nghiệp vụ hiện hành. Không auto-public toàn PUBLISHED. Đây là extension có chủ đích, không sửa các PASS/evidence lịch sử.
 
 **Quy ước:** `P0-P` = bắt buộc trong Prototype; `P0-M` = bắt buộc để mở MVP beta. `AC` = acceptance criterion; mỗi AC phải kiểm tra được. Nội dung UI bằng tiếng Việt.
 

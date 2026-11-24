@@ -43,7 +43,7 @@ export function ProfilePage() {
     <button type="button" className="logout" disabled={task.busy} onClick={() => void task.run(async () => {
       setPending(null)
       // Commit route public trước Auth callback để protected gate không chuyển nhầm sang login.
-      flushSync(() => navigate('/', { replace: true }))
+      flushSync(() => navigate('/bang-tin', { replace: true }))
       await controller.logout(); notify('Đã đăng xuất.')
     })}>Đăng xuất</button>
   </section></>

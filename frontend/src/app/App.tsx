@@ -11,6 +11,7 @@ import { FeedPage } from '../features/feed/FeedPage.tsx'
 import { CreatePostPage } from '../features/posts/CreatePostPage.tsx'
 import { PostDetailPage } from '../features/posts/PostDetailPage.tsx'
 import { AdminPage } from '../features/moderation/AdminPage.tsx'
+import { LandingPage } from '../features/landing/LandingPage.tsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ export function App() {
       <BrowserRouter useTransitions={false}>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route element={<AuthLayout />}>
               <Route element={<SessionGate />}>
                 <Route path="/dang-nhap" element={<CredentialsPage key="login" />} />
@@ -34,8 +36,7 @@ export function App() {
               </Route>
             </Route>
             <Route element={<AppFrame />}>
-              <Route path="/" element={<FeedPage />} />
-              <Route path="/bang-tin" element={<Navigate to="/" replace />} />
+              <Route path="/bang-tin" element={<FeedPage />} />
               <Route element={<SessionGate protectedRoute />}>
                 <Route path="/ca-nhan" element={<ProfilePage />} />
                 <Route path="/admin" element={<AdminPage />} />
