@@ -120,9 +120,9 @@ function MediaCarousel({ postId, images, detailLink }: { postId: string; images:
       {multiple && <>
         <span className="carousel-counter" aria-hidden="true">{selected + 1}/{shown.length}</span>
         <button type="button" className="carousel-control carousel-previous" aria-label="Ảnh trước" disabled={selected === 0}
-          onClick={event => { event.stopPropagation(); move(selected - 1) }}><Icon name="more" /></button>
+          onClick={event => { event.stopPropagation(); move(selected - 1) }}><Icon name="chevron" /></button>
         <button type="button" className="carousel-control carousel-next" aria-label="Ảnh tiếp theo" disabled={selected === shown.length - 1}
-          onClick={event => { event.stopPropagation(); move(selected + 1) }}><Icon name="more" /></button>
+          onClick={event => { event.stopPropagation(); move(selected + 1) }}><Icon name="chevron" /></button>
       </>}
     </div>
     {multiple && <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">Ảnh {selected + 1} trên {shown.length}</span>}

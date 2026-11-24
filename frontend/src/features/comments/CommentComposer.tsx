@@ -4,7 +4,7 @@ import { Alert } from '../auth/components.tsx'
 import { commentBodyError, createCommentSubmission } from './comment-submission.ts'
 import { Icon } from '../../shared/components/Icon.tsx'
 
-export function CommentComposer({postId,onSuccess,onMissing}:{postId:string;onSuccess:()=>Promise<void>;onMissing:(error:unknown)=>void}) {
+export function CommentComposer({postId,onSuccess,onMissing}:{postId:string;onSuccess:(id:string)=>Promise<void>;onMissing:(error:unknown)=>void}) {
   const {api,controller,scope,notify}=useAuth()
   const active=useRef(true)
   const form=useRef<HTMLFormElement>(null)
@@ -49,7 +49,7 @@ export function CommentComposer({postId,onSuccess,onMissing}:{postId:string;onSu
     try {
       const comment=await model.submit(body)
       if(!comment||!active.current||controller.getScope()!==scope)return
-      setBody('');setSubmitted(false);notify('Đã gửi bình luận.');await onSuccess()
+      setBody('');setSubmitted(false);notify('Đã gửi bình luận.');await onSuccess(comment.id)
     } finally {pending.current=false}
   }}>
     <label className="sr-only" htmlFor="comment-body">Bình luận của bạn</label>

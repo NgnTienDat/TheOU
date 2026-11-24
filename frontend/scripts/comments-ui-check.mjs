@@ -17,7 +17,7 @@ const envelope=data=>({data,error:null,meta:{requestId:id(999)}})
 const fail=(code)=>({data:null,error:{code,message:'PRIVATE SQL JWT secret@ou.edu.vn',details:null},meta:{requestId:id(999)}})
 const comment=n=>({id:id(n+10),postId:id(1),body:n===3?'x'.repeat(500):`Bình luận offline ${n}.\n\nCùng lắng nghe nhé.`,authorLabel:n%2?'Chủ bài':'OUer ẩn danh',isOriginalPoster:!!(n%2),isMine:n%3===0,createdAt:new Date(Date.now()-(200-n)*60_000).toISOString()})
 let comments=Array.from({length:23},(_,i)=>comment(i+1));const deleted=new Set();const snapshots=new Map()
-let contactUrl=null
+let contactUrl=null;let concurrentTail=false
 const post=()=>({id:id(1),tag:contactUrl?'TAI_LIEU':'CONFESSION',body:'Một câu chuyện offline.\n\nBình luận một tầng, giữ riêng tư.',displayMode:contactUrl?'NICKNAME':'ANONYMOUS',authorLabel:contactUrl?'OUer snapshot':'OUer ẩn danh',contactUrl,publishedAt:'2026-11-16T12:00:00Z',upvoteCount:0,commentCount:comments.filter(c=>!deleted.has(c.id)).length,hasUpvoted:false,isMine:true,images:[]})
 let postMode='ready';let listMode='long';let createMode='normal';let deleteMode='normal';let lost=false;let holdCreate=false;let releaseCreate;let releasePost;let releaseList;let releaseDelete
 const createCalls=[];const deleteCalls=[];const listCalls=[];let browser;let shots=0
@@ -27,6 +27,11 @@ try{
   assert.equal(ready,true,'Vite mock phải sẵn sàng trước browser test')
   browser=await chromium.launch({executablePath:process.env.THEOU_BROWSER_PATH??'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',headless:true})
   const context=await browser.newContext({reducedMotion:'reduce'});const page=await context.newPage();const errors=[];page.on('pageerror',()=>errors.push('runtime error'))
+  await context.addInitScript(()=>{
+    const native=Element.prototype.scrollIntoView
+    window.__commentScroll=[]
+    Element.prototype.scrollIntoView=function(options){if(this.dataset?.commentId)window.__commentScroll.push({id:this.dataset.commentId,behavior:options?.behavior});return native.call(this,options)}
+  })
   await context.route('**/*',async route=>{
     const request=route.request();const url=new URL(request.url());if(url.origin===origin&&url.pathname==='/__v2-reference.html')return route.fulfill({contentType:'text/html',body:prototype});if(url.origin===origin)return route.continue();if(url.origin!=='https://offline.example.invalid')return route.abort()
     const input=request.postDataJSON()??{};let body={};let status=200
@@ -57,7 +62,7 @@ try{
         if(createMode==='missing'){status=404;body=fail('NOT_FOUND')}
         else if(createMode==='conflict'){status=409;body=fail('CONFLICT')}
         else{
-          if(!snapshots.has(input.payload.idempotencyKey)){const c={...comment(100+snapshots.size),body:input.payload.body,postId:input.payload.postId,isMine:true};snapshots.set(input.payload.idempotencyKey,c);comments.push(c)}
+          if(!snapshots.has(input.payload.idempotencyKey)){const c={...comment(100+snapshots.size),body:input.payload.body,postId:input.payload.postId,isMine:true};snapshots.set(input.payload.idempotencyKey,c);comments.push(c);if(concurrentTail){c.createdAt=new Date().toISOString();comments.push({...comment(300+snapshots.size),body:'Bình luận đồng thời của người khác',isMine:false,createdAt:new Date(Date.now()+1).toISOString()})}}
           if(createMode==='lost'&&!lost){lost=true;return route.abort()}
           body=envelope(snapshots.get(input.payload.idempotencyKey))
         }
@@ -92,6 +97,14 @@ try{
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedUrl=value}}}))
   await page.getByRole('button',{name:'Sao chép liên kết bài',exact:true}).click()
   assert.equal(await page.evaluate(()=>window.__copiedUrl),`${origin}/bai-viet/${id(1)}`)
+  await page.getByRole('button',{name:'Tùy chọn bài viết',exact:true}).click()
+  await page.getByRole('menuitem',{name:'Sao chép liên kết',exact:true}).click()
+  assert.equal(await page.evaluate(()=>window.__copiedUrl),`${origin}/bai-viet/${id(1)}`)
+  assert.equal(await page.locator('[role=menu]:visible').count(),0)
+  await page.getByRole('link',{name:/bình luận — mở thảo luận/}).focus();await page.keyboard.press('Enter')
+  await page.waitForURL(`**/bai-viet/${id(1)}#comments-heading`)
+  await page.waitForFunction(()=>document.activeElement?.id==='comments-heading')
+  await back()
   assert.equal(new URL(page.url()).pathname,'/bang-tin')
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('offline clipboard denied')}}}))
   await page.getByRole('button',{name:'Sao chép liên kết bài',exact:true}).click()
@@ -119,8 +132,12 @@ try{
   assert.equal(await page.locator('.comment-card .post-avatar,.comment-card a').count(),0)
   assert.doesNotMatch(await page.locator('.comments-section').innerHTML(),new RegExp(`${user.email}|${user.id}|OUer riêng tư|author_id|authorId|userMetadata`))
   assert.equal(await page.getByRole('button',{name:'Xóa bình luận của bạn',exact:true}).count(),6)
+  assert.equal(await page.locator('.comments-footer').innerText(),'','Chưa có footer hết bình luận khi còn cursor')
   for(const width of [360,390,768,1280])for(const theme of ['dark','light']){
     await shot('post-comments',width,theme)
+    const font=await page.locator('#comment-body').evaluate(e=>({size:getComputedStyle(e).fontSize,line:getComputedStyle(e).lineHeight}))
+    assert.equal(font.size,width<=720?'16px':'13px')
+    assert.ok(Math.abs(parseFloat(font.line)-(width<=720?24.8:20.15))<.01)
     const layout=await page.evaluate(()=>{const form=document.querySelector('.comment-composer');const post=document.querySelector('.post-thread>.post-card');const content=document.querySelector('.comments-content');const title=document.querySelector('.comments-title');return{position:getComputedStyle(form).position,form:form.getBoundingClientRect().toJSON(),post:post.getBoundingClientRect().toJSON(),title:title.getBoundingClientRect().toJSON(),content:content.getBoundingClientRect().toJSON(),height:innerHeight}})
     assert.equal(layout.title.top,layout.post.bottom)
     if(width<=720){assert.equal(layout.position,'fixed');assert.equal(layout.form.bottom,layout.height-64);assert.equal(layout.form.x,0);assert.equal(layout.form.width,width);assert.equal(layout.content.top,layout.title.bottom)}
@@ -139,6 +156,7 @@ try{
   await reference.close()
   listMode='page-error';await page.getByRole('button',{name:'Tải thêm bình luận',exact:true}).click();await page.getByRole('button',{name:'Thử tải thêm',exact:true}).waitFor();assert.equal(await page.locator('.comment-card').count(),20)
   listMode='long';await page.getByRole('button',{name:'Thử tải thêm',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.comment-card').length===23)
+  await page.getByText('Đã hiển thị hết bình luận.',{exact:true}).waitFor()
   assert.equal(listCalls.at(-1).cursor,'opaque-comments-page-2')
   await reload();await page.waitForFunction(()=>document.querySelectorAll('.comment-card').length===20)
   listMode='cursor-error';await page.getByRole('button',{name:'Tải thêm bình luận',exact:true}).click();await page.getByRole('button',{name:'Tải lại bình luận',exact:true}).waitFor()
@@ -184,6 +202,7 @@ try{
   assert.equal(createCalls.length,2);assert.deepEqual(createCalls[0],createCalls[1]);assert.equal(createCalls[0].body,'Comment retry offline 👋')
   await page.waitForFunction(()=>document.querySelector('.post-stats')?.textContent.includes('24 bình luận'))
   await back();await page.waitForFunction(()=>document.querySelector('.post-stats')?.textContent.includes('24 bình luận'));await open();await page.locator('.comment-card').first().waitFor()
+  await reload();await page.waitForFunction(()=>document.querySelectorAll('.comment-card').length===20)
   const remove=page.getByRole('button',{name:'Xóa bình luận của bạn',exact:true}).first()
   page.once('dialog',dialog=>dialog.dismiss());await remove.click();assert.equal(deleteCalls.length,0)
   deleteMode='error';page.once('dialog',dialog=>dialog.accept());await remove.click();await page.locator('.comments-section .form-alert').waitFor();assert.equal(await page.locator('.comment-card').count(),20)
@@ -198,6 +217,24 @@ try{
   postMode='error';listMode='long';await page.goto(`${origin}/bai-viet/${id(2)}`);await page.getByRole('heading',{name:'Không tìm thấy bài viết',exact:true}).waitFor()
   await page.goto(`${origin}/bai-viet/${id(1)}`);await page.getByRole('heading',{name:'Không tải được bài viết',exact:true}).waitFor()
   postMode='ready';await page.getByRole('button',{name:'Thử lại',exact:true}).click();await page.locator('.comment-card').first().waitFor()
+  // ACK nằm ở trang sau nhưng không phải dòng cuối: không cuộn nhầm comment đồng thời.
+  concurrentTail=true
+  for(const motion of ['reduce','no-preference']){
+    await page.emulateMedia({reducedMotion:motion});await page.evaluate(()=>{window.__commentScroll=[]})
+    await input.fill(`Cuộn đúng ID ${motion}`);await input.press('Control+Enter')
+    const key=()=>createCalls.at(-1)?.idempotencyKey
+    await page.waitForFunction(()=>window.__commentScroll.length>0)
+    const expected=snapshots.get(key()).id
+    assert.deepEqual(await page.evaluate(()=>window.__commentScroll),[{id:expected,behavior:motion==='reduce'?'instant':'smooth'}])
+    assert.notEqual(await page.locator('.comment-card').last().getAttribute('data-comment-id'),expected)
+    assert.equal(await page.locator(`[data-comment-id="${expected}"]`).count(),1)
+  }
+  holdCreate=true;releaseCreate=null;await input.fill('ACK cũ sau unmount');await input.press('Control+Enter')
+  for(let n=0;n<100&&!releaseCreate;n++)await page.waitForTimeout(10)
+  assert.ok(releaseCreate);await page.goto(origin+'/bang-tin');await page.locator('.post-card').waitFor()
+  await page.evaluate(()=>{window.__commentScroll=[]});holdCreate=false;releaseCreate();await page.waitForTimeout(200)
+  assert.deepEqual(await page.evaluate(()=>window.__commentScroll),[],'ACK sau unmount không cuộn trang mới')
+  await open();await page.locator('.comment-card').first().waitFor()
   const theme=await page.getAttribute('html','data-theme');await back();assert.equal(await page.getAttribute('html','data-theme'),theme)
   await page.getByRole('link',{name:'Cá nhân',exact:true}).click();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await page.waitForURL(origin + '/bang-tin');assert.equal(await page.locator('.comment-card').count(),0)
   assert.deepEqual(errors,[])

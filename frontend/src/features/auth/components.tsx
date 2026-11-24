@@ -1,8 +1,9 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { Icon } from '../../shared/components/Icon.tsx'
 
 export function Arrow() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" /></svg> }
 export function Note({ children }: { children: ReactNode }) {
-  return <div className="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></svg><span>{children}</span></div>
+  return <div className="note"><Icon name="shield"/><span>{children}</span></div>
 }
 export function Field({ label, error, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
   const id = useId()
