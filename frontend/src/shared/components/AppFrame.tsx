@@ -15,13 +15,14 @@ export function AppFrame({ children }: { children?: ReactNode }) {
     notify(next === 'dark' ? 'Đã chuyển sang giao diện tối' : 'Đã chuyển sang giao diện sáng')
   }
   const brand = <TheOUBrand />
+  const isPostDetail = pathname.startsWith('/bai-viet/') && pathname !== '/bai-viet/moi'
   if (!children) return <div className="app social-app">
     <aside className="social-navigation" aria-label="Điều hướng TheOU">
       <Link className="mini-brand rail-logo" aria-label="TheOU — Bảng tin" to="/bang-tin">{brand}</Link>
       <nav className="social-nav" aria-label="Điều hướng chính">
         <Link className="nav-item" aria-label="Bảng tin" title="Bảng tin" aria-current={pathname === '/bang-tin' || (pathname.startsWith('/bai-viet/') && pathname !== '/bai-viet/moi') ? 'page' : undefined} to="/bang-tin"><Icon name="home" /></Link>
         <Link className="nav-item nav-create" aria-label="Viết bài" title="Viết bài" aria-current={pathname === '/bai-viet/moi' ? 'page' : undefined} to={state.phase === 'ready' ? '/bai-viet/moi' : '/dang-nhap'}><Icon name="plus" /></Link>
-        {state.phase === 'ready' ? <Link className="nav-item nav-profile" aria-label="Cá nhân" title="Cá nhân" aria-current={pathname === '/ca-nhan' ? 'page' : undefined} to="/ca-nhan"><Icon name="user" /></Link> : <Link className="nav-item" aria-label="Đăng nhập" title="Đăng nhập" to="/dang-nhap"><Icon name="user" /></Link>}
+        {state.phase === 'ready' ? <Link className="nav-item nav-profile" aria-label="Cá nhân" title="Cá nhân" aria-current={pathname === '/ca-nhan' ? 'page' : undefined} to="/ca-nhan"><span className="nav-avatar" aria-hidden="true">OU</span><span className="profile-nav-icon"><Icon name="user" /></span></Link> : <Link className="nav-item" aria-label="Đăng nhập" title="Đăng nhập" to="/dang-nhap"><Icon name="user" /></Link>}
       </nav>
       <button className="icon-button social-theme" type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển giao diện sáng' : 'Chuyển giao diện tối'} title="Đổi giao diện"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
     </aside>
@@ -30,7 +31,9 @@ export function AppFrame({ children }: { children?: ReactNode }) {
       <Link className="mobile-logo" to="/bang-tin" aria-label="TheOU trang chủ">{brand}</Link><span className="header-spacer" />
     </header>
     <main className="social-wrap"><Outlet /></main>
-    <footer className="disclaimer">TheOU là dự án độc lập do sinh viên phát triển, không phải kênh chính thức của Trường Đại học Mở TP.HCM.</footer>
+    <footer className={`disclaimer${pathname === '/bang-tin' ? ' feed-disclaimer' : isPostDetail ? ' detail-disclaimer' : ''}`}>
+      {isPostDetail ? 'Bạn tham gia ẩn danh trước cộng đồng; TheOU vẫn áp dụng quy định chung để bảo vệ người tham gia.' : <>TheOU là dự án độc lập do sinh viên phát triển, không phải kênh chính thức của Trường Đại học Mở TP.HCM.{pathname === '/bang-tin' && <> <Link className="about-link" to="/">Về trang giới thiệu</Link></>}</>}
+    </footer>
     <div className={`toast${notice ? ' show' : ''}`} role="status" aria-live="polite">{notice}</div>
   </div>
   return <div className="app">

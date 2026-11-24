@@ -115,7 +115,7 @@ try {
   assert.equal(await page.getByLabel('Mật khẩu', { exact: true }).getAttribute('type'), 'text')
   await page.getByRole('button', { name: 'Ẩn mật khẩu', exact: true }).click()
   await login(); await ready()
-  assert.equal(await page.locator('.profile-info').textContent(), '***@ou.edu.vn')
+  assert.equal(await page.locator('.profile-email').textContent(), '***@ou.edu.vn')
   await page.reload(); await ready()
   await page.getByRole('button', { name: 'Chỉnh sửa' }).click()
   await page.getByLabel('Biệt danh mới').fill('ab')

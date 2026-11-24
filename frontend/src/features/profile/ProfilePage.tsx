@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { Alert, Field, Submit } from '../auth/components.tsx'
 import { nicknameError } from '../auth/validation.ts'
+import { Icon } from '../../shared/components/Icon.tsx'
 
 export function ProfilePage() {
   const { state, controller, api, notify, setPending } = useAuth()
@@ -19,13 +20,15 @@ export function ProfilePage() {
   return <><header className="page-header"><h1>Cá nhân</h1></header><section className="card profile-panel" aria-label="Thông tin cá nhân">
     <Alert message={task.error} />
     <div className="profile-top">
+      <div className="min-w-0"><h2 className="profile-name wrap-anywhere">{me.nickname}</h2><p className="profile-info">Biệt danh của bạn trên TheOU</p></div>
       <div className="avatar" aria-hidden="true">OU</div>
-      <div className="min-w-0"><div className="profile-name wrap-anywhere">{me.nickname}</div><div className="profile-info">{me.emailMasked}</div><div className="status-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg> Email đã xác minh</div></div>
     </div>
+    <div className="divider" />
+    <div className="profile-email">{me.emailMasked}</div><div className="profile-verified"><Icon name="check"/>Email đã xác minh</div>
     <div className="divider" />
     <div className="profile-row"><span className="section-label">Biệt danh của bạn</span>{!editing && <button className="ghost" type="button" disabled={task.busy} onClick={() => { setEditing(true); setNickname(me.nickname); setSubmitted(false); task.setError('') }}>Chỉnh sửa</button>}</div>
     <div className="read-value wrap-anywhere">{me.nickname}</div>
-    <div className="profile-caption">Biệt danh chỉ xuất hiện khi bạn chọn đăng bài công khai bằng biệt danh. Bài ẩn danh vẫn giữ riêng tư.</div>
+    <div className="profile-caption profile-tip"><Icon name="shield"/>Biệt danh chỉ xuất hiện khi bạn chọn đăng bài công khai bằng biệt danh. Bài ẩn danh vẫn giữ riêng tư.</div>
     {me.isAdmin && <p><Link className="ghost" to="/admin">Kiểm duyệt nội dung</Link></p>}
     {editing && <form className="profile-edit open" noValidate aria-busy={task.busy} onSubmit={task.submit(async () => {
       setSubmitted(true)

@@ -66,10 +66,11 @@ try {
     }
   }
   const login = async () => { if (await page.locator('input[name=email]').count() === 0) await page.goto(origin + '/dang-nhap'); await page.getByLabel('Email trường', { exact: true }).fill(user.email); await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-password!'); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.waitForURL(origin + '/bang-tin') }
-  const confirm = async (name, accept = true) => { page.once('dialog', dialog => accept ? dialog.accept() : dialog.dismiss()); await page.getByRole('button', { name, exact: true }).click() }
+  const confirm = async (name, accept = true) => { if(name==='Xóa bài viết'&&!await page.getByRole('menuitem',{name,exact:true}).isVisible())await page.locator('.post-card').filter({has:page.locator('.post-delete')}).getByRole('button',{name:'Tùy chọn bài viết',exact:true}).click(); page.once('dialog', dialog => accept ? dialog.accept() : dialog.dismiss()); await page.getByRole(name==='Xóa bài viết'?'menuitem':'button', { name, exact: true }).click() }
   await page.goto(origin + '/dang-nhap'); await page.waitForURL('**/dang-nhap'); await login()
-  await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).count(), 1, 'chỉ owner có delete')
+  await page.locator('.post-card').filter({has:page.locator('.post-delete')}).getByRole('button',{name:'Tùy chọn bài viết',exact:true}).click()
+  await page.getByRole('menuitem', { name: 'Xóa bài viết', exact: true }).waitFor()
+  assert.equal(await page.getByRole('menuitem', { name: 'Xóa bài viết', exact: true }).count(), 1, 'chỉ owner có delete')
   await page.locator('.post-image-frame img').waitFor(); await shot('owner-feed')
   await confirm('Xóa bài viết', false); assert.equal(calls.length, 0)
   mode = 'error'; await confirm('Xóa bài viết'); await page.getByRole('alert').waitFor()
@@ -105,8 +106,8 @@ try {
   // Late Auth error của request cũ không được logout phiên mới.
   hidden = false; await page.goto(origin + '/bang-tin'); mode = 'hold'; held = false; await confirm('Xóa bài viết')
   for (let n = 0; n < 100 && !held; n++) await page.waitForTimeout(20)
-  assert.ok(held); assert.equal(await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).isDisabled(), true)
-  const count = calls.length; await page.getByRole('button', { name: 'Xóa bài viết', exact: true }).evaluate(node => { node.click(); node.click() }); assert.equal(calls.length, count)
+  assert.ok(held); assert.equal(await page.getByRole('menuitem', { name: 'Xóa bài viết', exact: true }).isDisabled(), true)
+  const count = calls.length; await page.getByRole('menuitem', { name: 'Xóa bài viết', exact: true }).evaluate(node => { node.click(); node.click() }); assert.equal(calls.length, count)
   await page.getByRole('link', { name: 'Cá nhân', exact: true }).click(); await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL(origin + '/bang-tin')
   await login(); mode = ''; release(); await page.waitForTimeout(200); assert.equal(new URL(page.url()).pathname, '/bang-tin')
   assert.deepEqual(errors, [])
