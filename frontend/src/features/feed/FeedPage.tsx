@@ -14,7 +14,7 @@ export function FeedPage() {
   const writePath = guest ? '/dang-nhap' : '/bai-viet/moi'
   const cursorError = query.error instanceof SocialApiError && query.error.code === 'VALIDATION_ERROR'
   return <>
-    <header className="page-header feed-header"><div className="brand-word" aria-hidden="true">theou<span>.</span></div><h1 className="sr-only">Bảng tin</h1><button className="icon-button refresh-button" aria-label="Làm mới bảng tin" type="button" disabled={query.isFetching} onClick={() => void refresh()}><Icon name="refresh" /></button></header>
+    <header className="page-header feed-header"><div className="brand-word" aria-hidden="true"><span className="theou-logo-word">TheOU</span></div><h1 className="sr-only">Bảng tin</h1><button className="icon-button refresh-button" aria-label="Làm mới bảng tin" type="button" disabled={query.isFetching} onClick={() => void refresh()}><Icon name="refresh" /></button></header>
     <div className="feed-heading"><div><div className="intro-mini">CHUYỆN CỦA OU, NGƯỜI OU CÙNG BÀN</div><h2>Hôm nay OU có chuyện gì?</h2><p className="social-lede">Góc nhỏ dành cho những câu chuyện đáng kể.</p></div><Link className="icon-button quick-write" to={writePath} aria-label="Viết bài mới" title="Viết bài mới"><Icon name="pen" /></Link></div>
     {guest && <p className="social-lede"><Link className="ghost" to="/dang-nhap">Đăng nhập để tương tác</Link></p>}
     <section className="feed-controls" aria-label="Bộ lọc bảng tin">

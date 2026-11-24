@@ -33,7 +33,7 @@ TheOU gives people with a verified `@ou.edu.vn` email a dedicated place to share
 | <img src="docs/assets/screenshots/feed.png" alt="TheOU feed with NEW and HOT sorting, topic filters, and posts" width="280"> | <img src="docs/assets/screenshots/post-detail.png" alt="TheOU post detail with comments and upvotes" width="280"> | <img src="docs/assets/screenshots/create-post.png" alt="TheOU create-post screen with anonymous mode and image attachments" width="280"> |
 | Browse recent and trending discussions | Read and join a conversation | Publish anonymously or with a nickname |
 
-**Reviewing the project without an OU email?** A public read-only feed is being prepared locally at `/`: only owner-approved anonymous published posts, without images, detail access, or interaction. It is **not yet Cloud-verified**. Membership and all protected features still require a verified `@ou.edu.vn` account. No existing posts become public automatically.
+**Reviewing the project without an OU email?** `/` is the Landing page; `/bang-tin` provides the read-only guest feed: only owner-approved anonymous published posts, without images, detail access, or interaction. Membership and protected features require a verified `@ou.edu.vn` account. No existing posts become public automatically. The new Landing routing has only been verified locally.
 
 ## Features
 
@@ -70,7 +70,7 @@ flowchart LR
 
 The React client uses Supabase Auth for sessions. **All social business operations go through `social-api`**, rather than direct reads and writes to application tables. This keeps authentication, authorization, and public response shaping at a controlled server boundary. The frontend depends on a typed `SocialApiClient` contract, making the API implementation replaceable without rewriting the UI.
 
-**Guest feed — Phase A:** `public-feed` is a separate read-only Edge Function; `social-api` keeps JWT verification. Server-only `THEOU_PUBLIC_FEED_POST_IDS` defaults to empty, accepts at most100 reviewed post IDs, and never exposes private images or identity fields. `/bang-tin` redirects to `/`; guest actions lead to login. Deployment, approved content scope and rollback require owner review. See [local implementation and checks](docs/reports/PUBLIC-GUEST-FEED-LOCAL.md); no migration, client grants or RLS changes.
+**Guest feed — Phase A:** `public-feed` is a separate read-only Edge Function; `social-api` keeps JWT verification. Server-only `THEOU_PUBLIC_FEED_POST_IDS` defaults to empty, accepts at most100 reviewed post IDs, and never exposes private images or identity fields. `/` renders Landing; `/bang-tin` renders Feed; guest actions lead to login. Deployment, approved content scope and rollback require owner review. See [local implementation and checks](docs/reports/PUBLIC-GUEST-FEED-LOCAL.md); no migration, client grants or RLS changes.
 
 **Guest feed — B1/B2:** The owner confirmed three manual smoke groups PASS on TheOU-dev; see [dev acceptance](docs/reports/PUBLIC-GUEST-FEED-DEV-ACCEPTANCE.md). [Staging promotion](docs/reports/PUBLIC-GUEST-FEED-STAGING-PROMOTION.md) is prepared for owner review, with an initially empty public scope; staging acceptance remains pending.
 

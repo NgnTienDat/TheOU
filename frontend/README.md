@@ -90,3 +90,9 @@ Composer xử lý JPG/PNG/WebP bằng canvas, tối đa2 ảnh, ≤2MiB/ảnh sa
 Gallery Feed/Detail dùng PublicImage signed URL300giây, placeholder/error/expiry và tải lại tối đa3lần/mount; không public URL fallback hoặc log URL. Timeout upload30giây có thể là unknown commit; retry finalize trước, cùng post/key/blob, không upsert. Sau bắt đầu publish không đổi attachments.
 
 `npm.cmd run test:ui:media` chạy Edge/Playwright với Auth/API/Storage giả, chặn mạng ngoài host local/offline; ảnh tại `node_modules/.cache/theou-media-ui/`. Không gọi Cloud. Chạy cùng các scripts Auth/Feed/Comments/Upvote khi review T10. Bucket/migration/deploy chỉ sau review T10-B; xem [báo cáo](../docs/reports/T10-A-IMPLEMENTATION.md).
+
+## Landing React — 24/11/2026
+
+Navbar hiện hành: “Khám phá ngay” luôn mở `/bang-tin` (guest đọc allowlist); link “Đăng nhập” riêng bên cạnh chỉ hiện khi guest. Không thay Auth flow hoặc quyền Feed.
+
+`/` luôn là Landing; Feed chuyển sang `/bang-tin`, gồm guest allowlist và member. Protected routes không đổi. Dùng đúng HTML `docs/fe-templates/TheOU-Landing-Black-White.html`; CSS cô lập, demo trong bộ nhớ, không API. Navbar CTA luôn tới Feed; Feed xử lý trạng thái phiên bằng AuthProvider hiện có. Chạy `npm.cmd run test:ui:landing` với `THEOU_BROWSER_PATH` là Chrome; port 5195, mock-only. Artifacts ở `node_modules/.cache/theou-landing-ui/`. Các mô tả cũ dùng `/` làm Feed bên dưới được thay bằng `/bang-tin`.

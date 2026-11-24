@@ -1,12 +1,16 @@
 # 03 — Đặc tả UI/UX và User Flows
 
+**Routing hiện hành — 24/11/2026:** `/` là Landing theo `TheOU-Landing-Black-White.html`, luôn hiển thị cho guest/member; `/bang-tin` là Feed. Login/OTP, logout, publish/delete và các nút quay lại Feed dùng `/bang-tin`. Landing demo không gọi API; guest Feed vẫn dùng allowlist server, không mở thêm dữ liệu công khai. Chỉ kiểm local, chưa deploy. Xem [báo cáo Landing](reports/LANDING-REACT-INTEGRATION.md).
+
 ## Guest feed — Phase A local, 23/11/2026
 
-`/` dùng FeedPage/shell V2 cho cả guest/member; `/bang-tin` redirect `/`. Guest có NEW/HOT, tag, pagination, loading/empty/error/retry; không Landing Page. Read-only cards không link Detail hoặc ảnh, không vote/share/delete/contact. Hiện CTA **Đăng nhập để tương tác** → `/dang-nhap`; nút viết bài cũng tới login, nav Cá nhân/Admin bị ẩn. Empty state: chưa có bài công khai, không giả dữ liệu demo. Route Detail/Compose/Profile/Admin vẫn protected. Login về `/`; logout điều hướng `/` trước khi dọn session để tránh route trung gian/loop. Phiên loading/BANNED/error không kích hoạt member hoặc guest query; hiển thị trạng thái Auth/retry/logout. Giữ theme, responsive, focus và UI conventions đã duyệt; Cloud chưa kiểm thử.
+`/` hiển thị Landing; `/bang-tin` dùng FeedPage/shell V2 cho cả guest/member. Guest có NEW/HOT, tag, pagination, loading/empty/error/retry; Landing độc lập theo HTML Black-White đã duyệt. Read-only cards không link Detail hoặc ảnh, không vote/share/delete/contact. Hiện CTA **Đăng nhập để tương tác** → `/dang-nhap`; nút viết bài cũng tới login, nav Cá nhân/Admin bị ẩn. Empty state: chưa có bài công khai, không giả dữ liệu demo. Route Detail/Compose/Profile/Admin vẫn protected. Login về `/bang-tin`; logout điều hướng `/bang-tin` trước khi dọn session để tránh route trung gian/loop. Phiên loading/BANNED/error không kích hoạt member hoặc guest query; hiển thị trạng thái Auth/retry/logout. Giữ theme, responsive, focus và UI conventions đã duyệt; Cloud chưa kiểm thử.
 
 ## 1. Định hướng giao diện
 
-**Visual reference hiện tại:** Auth dùng prototype T05; các trang social dùng [TheOU Social UI V2 và conventions](fe-templates/README.md). **UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026)**; chủ dự án nghiệm thu visual6/6 và Cloud read-only regression6/6. Xem [báo cáo cuối](reports/UI-V2-STATUS-REPORT.md). T01–T08 giữ trạng thái nghiệm thu đã chốt. HTML quyết định appearance; bảo mật, API và nghiệp vụ vẫn theo tài liệu nguồn. Bỏ preview/mock/OTP mẫu. Login/OTP về `/` sau getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. T09-A upvote đã triển khai local, chờ review/deploy; chưa nghiệm thu T09.
+Nhận diện hiện hành theo owner: logo chữ “t” trong ô nghiêng + “TheOU” thay “theou.” trên Landing và shell Feed. Desktop Feed chỉ chữ “TheOU” ở tiêu đề, chỉ một mark trên sidebar với shadow nhẹ; mobile header có cả mark/wordmark. Không đổi routing hoặc quyền guest/member.
+
+**Visual reference hiện tại:** Auth dùng prototype T05; các trang social dùng [TheOU Social UI V2 và conventions](fe-templates/README.md). **UI-V2 — Post-T08 / Pre-T09: COMPLETED — PASS (17/11/2026)**; chủ dự án nghiệm thu visual6/6 và Cloud read-only regression6/6. Xem [báo cáo cuối](reports/UI-V2-STATUS-REPORT.md). T01–T08 giữ trạng thái nghiệm thu đã chốt. HTML quyết định appearance; bảo mật, API và nghiệp vụ vẫn theo tài liệu nguồn. Bỏ preview/mock/OTP mẫu. Login/OTP về `/bang-tin` sau getMe; `/ca-nhan` tiếp tục dành cho nickname/logout. T09-A upvote đã triển khai local, chờ review/deploy; chưa nghiệm thu T09.
 
 - **Ưu tiên tiếng Việt**, đơn giản, ngắn gọn, không dùng thuật ngữ kỹ thuật với sinh viên.
 - Mobile-first: social một cột tối đa640px, rail92px desktop (66px ở721–1100px), mobile≤720px có header/bottom nav. Auth giữ chiều rộng T05.
@@ -21,7 +25,8 @@
 | `/dang-nhap` | Đăng nhập | Khách | W1 |
 | `/dang-ky` | Đăng ký | Khách | W1 |
 | `/xac-thuc` | Xác minh email đăng ký | Khách có đăng ký đang chờ xác minh | W1 |
-| `/` | Bảng tin (guest allowlist/member feed riêng) | Tất cả | Guest Phase A local |
+| `/` | Landing | Tất cả | Local verified |
+| `/bang-tin` | Feed guest allowlist/member | Tất cả | Scope không đổi |
 | `/bai-viet/moi` | Viết bài | Thành viên OU | W1 |
 | `/bai-viet/:id` | Chi tiết bài & bình luận | Thành viên OU | W2 |
 | `/ca-nhan` | Biệt danh và đăng xuất | Thành viên OU | W1 |
@@ -123,7 +128,7 @@ flowchart TD
 
 Contact dùng HTTPS và exact hostname theo allowlist T06; không credentials/cổng khác mặc định/khoảng trắng/control. Đổi sang ẩn danh hoặc tag khác sẽ xóa giá trị contact và bỏ hẳn field khỏi payload.
 
-T07 chỉ thông báo thành công sau publish, về Feed `/` thay vì trang chi tiết W2. UUID/payload canonical được khóa sau lần gửi đầu; retry create dùng cùng key/payload, đã ACK thì retry publish cùng postId. Fields bị khóa khi đang gửi hoặc chờ retry, text không mất khi lỗi mạng/server. Không lưu nội dung/key/postId vào storage. Rời qua link nội bộ có confirm; reload/đóng tab có cảnh báo native, Back/Forward SPA chưa chặn. Reload/rời trang hoặc Auth revalidation làm unmount có thể mất draft/trạng thái chưa rõ; không tự tạo bài mới để phục hồi. Quy trình có ảnh và khôi phục draft qua server thuộc các task sau.
+T07 chỉ thông báo thành công sau publish, về Feed `/bang-tin` thay vì trang chi tiết W2. UUID/payload canonical được khóa sau lần gửi đầu; retry create dùng cùng key/payload, đã ACK thì retry publish cùng postId. Fields bị khóa khi đang gửi hoặc chờ retry, text không mất khi lỗi mạng/server. Không lưu nội dung/key/postId vào storage. Rời qua link nội bộ có confirm; reload/đóng tab có cảnh báo native, Back/Forward SPA chưa chặn. Reload/rời trang hoặc Auth revalidation làm unmount có thể mất draft/trạng thái chưa rõ; không tự tạo bài mới để phục hồi. Quy trình có ảnh và khôi phục draft qua server thuộc các task sau.
 
 ## 6. Luồng 4 — Bình luận và upvote
 

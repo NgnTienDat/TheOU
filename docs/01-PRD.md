@@ -1,8 +1,10 @@
 # 01 — Tài liệu yêu cầu sản phẩm (PRD)
 
+**Routing hiện hành — 24/11/2026:** `/` là Landing theo `TheOU-Landing-Black-White.html`, luôn hiển thị cho guest/member; `/bang-tin` là Feed. Login/OTP, logout, publish/delete và các nút quay lại Feed dùng `/bang-tin`. Landing demo không gọi API; guest Feed vẫn dùng allowlist server, không mở thêm dữ liệu công khai. Chỉ kiểm local, chưa deploy. Xem [báo cáo Landing](reports/LANDING-REACT-INTEGRATION.md).
+
 ## Bổ sung 23/11/2026 — Guest read-only feed (Phase A local)
 
-Theo yêu cầu owner, `/` là Feed cho guest và member; `/bang-tin` redirect về `/`, không Landing Page. Guest chỉ đọc danh sách NEW/HOT/tag/pages của bài **ANONYMOUS + PUBLISHED + ID được owner duyệt công khai**. Mặc định scope rỗng; không tự public bài cũ hoặc bài mới. Guest không có ảnh/signed URLs/contact/nickname, không mở Detail/thread, không tương tác/tạo nội dung/profile/admin. CTA đăng nhập vẫn dùng Auth OU hiện tại. Chưa nghiệm thu Cloud; mọi quy tắc Auth cho thành viên giữ nguyên. Không thay eligibility `@ou.edu.vn`. Xem [báo cáo Phase A](reports/PUBLIC-GUEST-FEED-LOCAL.md).
+Theo yêu cầu owner, `/` là Landing cho guest/member, không tự redirect; `/bang-tin` là Feed. Guest chỉ đọc danh sách NEW/HOT/tag/pages của bài **ANONYMOUS + PUBLISHED + ID được owner duyệt công khai**. Mặc định scope rỗng; không tự public bài cũ hoặc bài mới. Guest không có ảnh/signed URLs/contact/nickname, không mở Detail/thread, không tương tác/tạo nội dung/profile/admin. CTA đăng nhập vẫn dùng Auth OU hiện tại. Chưa nghiệm thu Cloud; mọi quy tắc Auth cho thành viên giữ nguyên. Không thay eligibility `@ou.edu.vn`. Xem [báo cáo Phase A](reports/PUBLIC-GUEST-FEED-LOCAL.md).
 
 **Dự án:** TheOU  
 **Phiên bản:** 1.1

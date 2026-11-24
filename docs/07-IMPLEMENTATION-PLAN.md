@@ -227,3 +227,7 @@ Quyết định tuần tới: [Tối đa 3 ưu tiên]
 ```
 
 **Không ép thời hạn bằng cách bỏ bảo mật, domain verification hoặc moderation.** Một Prototype giới hạn người dùng và đúng luồng có giá trị hơn một app nhiều tính năng nhưng rò danh tính.
+
+## Landing React — 24/11/2026
+
+Đã tích hợp local HTML Black-White vào React, `/` Landing, `/bang-tin` Feed; giữ guest allowlist. Regression và visual xem [báo cáo](reports/LANDING-REACT-INTEGRATION.md). **LOCAL VERIFIED / PENDING OWNER VISUAL REVIEW**, chưa deploy hoặc đóng thêm T13/Gate W2.

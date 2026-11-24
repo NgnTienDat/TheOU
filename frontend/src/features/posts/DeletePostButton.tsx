@@ -14,7 +14,7 @@ export function DeletePostButton({ postId, detailLink }: { postId: string; detai
     <button type="button" className="icon-button" aria-label="Xóa bài viết" title="Xóa bài viết" disabled={task.busy} aria-busy={task.busy}
       onClick={event => { event.stopPropagation(); if (task.busy || !window.confirm('Xóa bài viết này? Bài sẽ không còn hiển thị và chưa có chức năng khôi phục.')) return
         void task.run(() => runContentAction(cache, scope, { type: 'POST', id: postId }, () => api.deletePost(postId),
-          () => active.current && controller.getScope() === scope, controller.reject, () => { notify('Đã xóa bài viết.'); if (!detailLink) navigate('/', { replace: true }) }))
+          () => active.current && controller.getScope() === scope, controller.reject, () => { notify('Đã xóa bài viết.'); if (!detailLink) navigate('/bang-tin', { replace: true }) }))
       }}><Icon name="trash" /></button>
     {task.error && <p role="alert" className="content-action-error">{task.error}</p>}
   </div>

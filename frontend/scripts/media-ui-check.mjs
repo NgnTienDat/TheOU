@@ -232,7 +232,7 @@ try {
   await page.getByLabel('Email trường', { exact: true }).fill(user.email)
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-Password-Only-123')
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
-  await page.waitForURL(origin + '/')
+  await page.waitForURL(origin + '/bang-tin')
   {
     mediaCount = 2
     await page.goto(`${origin}/bai-viet/${id(1)}`)
@@ -323,7 +323,7 @@ try {
     recoverExpiry = false; voted = false
   }
   mediaCount = 0
-  await page.goto(origin)
+  await page.goto(origin + '/bang-tin')
   await page.locator('.post-card').waitFor()
   assert.equal(await page.locator('.post-images').count(), 0)
   await series('feed-no-images')
@@ -336,7 +336,7 @@ try {
   await page.waitForURL(`**/bai-viet/${id(1)}`)
   await series('detail-one-image')
   mediaCount = 2
-  await page.goto(origin)
+  await page.goto(origin + '/bang-tin')
   await page.locator('.post-image-frame img').waitFor()
   assert.equal(await page.locator('.post-image-frame img').count(), 1)
   assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
@@ -349,7 +349,7 @@ try {
   await series('feed-two-images')
   await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
   assert.equal(await page.locator('.carousel-counter').innerText(), '2/2')
-  assert.equal(new URL(page.url()).pathname, '/', 'Gallery controls không mở Detail')
+  assert.equal(new URL(page.url()).pathname, '/bang-tin', 'Gallery controls không mở Detail')
   await series('feed-second-image')
   assert.ok(await page.locator('.post-image-frame img').evaluate(img => getComputedStyle(img).objectFit === 'contain'))
   await page.getByRole('button', { name: 'Ảnh trước', exact: true }).click()
@@ -385,7 +385,7 @@ try {
   }
   await swipe(true)
   await page.waitForFunction(() => document.querySelector('.carousel-counter')?.textContent === '2/2')
-  assert.equal(new URL(page.url()).pathname, '/', 'Swipe không mở Detail')
+  assert.equal(new URL(page.url()).pathname, '/bang-tin', 'Swipe không mở Detail')
   await swipe(true, 1)
   await page.waitForFunction(() => document.querySelector('.carousel-counter')?.textContent === '1/2')
   const beforeScroll = await page.evaluate(() => scrollY)
@@ -400,7 +400,7 @@ try {
   assert.equal(await page.evaluate(() => window.__copied), `${origin}/bai-viet/${id(1)}`)
   await page.getByRole('button', { name: 'Upvote bài viết', exact: true }).click()
   await page.getByRole('button', { name: 'Bỏ upvote bài viết', exact: true }).waitFor()
-  assert.equal(new URL(page.url()).pathname, '/')
+  assert.equal(new URL(page.url()).pathname, '/bang-tin')
   await page.getByRole('link', { name: 'Mở ảnh 1 và chi tiết bài viết', exact: true }).click()
   await page.waitForURL(`**/bai-viet/${id(1)}`)
   await page.locator('.post-thread').waitFor()
@@ -409,7 +409,7 @@ try {
   await series('detail-two-images')
   await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
   await series('detail-second-image')
-  await page.goto(origin)
+  await page.goto(origin + '/bang-tin')
   const waitForReads = async target => {
     for (let n = 0; n < 100 && reads < target; n++) await page.waitForTimeout(40)
     assert.equal(reads, target)
@@ -468,7 +468,7 @@ try {
   assert.ok(readHeld)
   await page.getByRole('link', { name: 'Cá nhân', exact: true }).click()
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
-  await page.waitForURL(origin + '/')
+  await page.waitForURL(origin + '/bang-tin')
   holdRead = false; imageError = false; releaseRead()
   await page.waitForTimeout(400)
   assert.equal(await page.locator('.post-images').count(), 0, 'Late URL không tái xuất hiện sau logout')
@@ -476,7 +476,7 @@ try {
   await page.getByLabel('Email trường', { exact: true }).fill(user.email)
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-Password-Only-123')
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
-  await page.waitForURL(origin + '/')
+  await page.waitForURL(origin + '/bang-tin')
   await page.getByRole('link', { name: 'Viết bài', exact: true }).click()
   await series('composer-empty')
   const processed = await page.evaluate(async () => {
@@ -566,7 +566,7 @@ try {
   )
   uploadFail = false
   await page.getByRole('button', { name: 'Thử lại hoàn tất đăng bài', exact: true }).click()
-  await page.waitForURL(origin + '/')
+  await page.waitForURL(origin + '/bang-tin')
   assert.equal(calls.filter((action) => action === 'createPost').length, 1)
   assert.equal(calls.filter((action) => action === 'publishPost').length, 1)
   assert.deepEqual(runtimeErrors, [])

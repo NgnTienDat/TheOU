@@ -17,3 +17,6 @@
 .env.*.local
 .env.test.local
 
+/supabase/tests/performance/test-users.local.json
+/supabase/tests/performance/test-sessions.local.json
+/tests/
