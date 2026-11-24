@@ -1,7 +1,7 @@
 // Mọi Auth/API/Storage đều giả lập, chỉ mạng loopback và offline.example.invalid.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
@@ -73,9 +73,12 @@ let mediaCount = 1,
   reads = 0,
   imageReads = 0
 let voted = false
+let imageVariants = [0, 1], longFeed = false
+const imagePaths = [], sizing = []
+const imageWaiters = []
 const reservations = new Map(), uploaded = new Set(), ready = new Set(), calls = []
-const dto = () => ({
-  id: id(1),
+const dto = (postNumber = 1) => ({
+  id: id(postNumber),
   tag: 'CONFESSION',
   body: 'Ảnh giả lập màu sắc hình học. ' + 'Nội dung dài an toàn. '.repeat(8),
   displayMode: 'ANONYMOUS',
@@ -89,9 +92,9 @@ const dto = () => ({
   images: Array.from(
     { length: mediaCount },
     (_, n) => ({
-      id: id(10 + n),
-      signedUrl: `https://offline.example.invalid/storage/v1/object/sign/post-media/posts/${id(1)}/${
-        id(10 + n)
+      id: id(postNumber * 10 + n),
+      signedUrl: `https://offline.example.invalid/storage/v1/object/sign/post-media/posts/${id(postNumber)}/${
+        id(postNumber * 10 + n)
       }.${n ? 'webp' : 'png'}?token=offline-read-${reads}`,
       expiresAt: new Date(Date.now() + (expired ? -1000 : shortExpiry ? 500 : 300000)).toISOString(),
     }),
@@ -111,10 +114,11 @@ try {
   })
   const context = await browser.newContext({ reducedMotion: 'reduce' })
   const page = await context.newPage()
-  const mockImages = await page.evaluate(() => [false, true].map(portrait => {
+  const mockImages = await page.evaluate(() => [[900,600],[600,800],[600,600],[80,50],[2400,1600],[1800,150]].map(([width,height]) => {
+    const portrait = height > width
     const canvas = document.createElement('canvas')
-    canvas.width = portrait ? 600 : 900
-    canvas.height = portrait ? 800 : 600
+    canvas.width = width
+    canvas.height = height
     const ctx = canvas.getContext('2d')
     ctx.fillStyle = portrait ? '#2b526e' : '#f1c2a4'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -122,8 +126,7 @@ try {
     ctx.fillRect(60, 80, canvas.width - 120, canvas.height - 160)
     ctx.fillStyle = '#fbf4de'
     ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, 110, 0, Math.PI * 2); ctx.fill()
-    const mime = portrait ? 'image/webp' : 'image/png'
-    return { mime, bytes: canvas.toDataURL(mime).split(',')[1] }
+    return { width, height, png: canvas.toDataURL('image/png').split(',')[1], webp: canvas.toDataURL('image/webp').split(',')[1] }
   }))
   page.setDefaultTimeout(10000)
   const runtimeErrors = []
@@ -134,11 +137,13 @@ try {
     if (url.origin !== 'https://offline.example.invalid') return route.abort()
     if (url.pathname.startsWith('/storage/v1/object/sign/')) {
       imageReads++
-      if (holdImage) { imageHeld = true; await new Promise(resolve => { releaseImage = resolve }) }
-      const image = mockImages[url.pathname.endsWith('.webp') ? 1 : 0]
+      imagePaths.push(url.pathname)
+      if (holdImage) { imageHeld = true; await new Promise(resolve => { imageWaiters.push(resolve); releaseImage = () => { for(const done of imageWaiters.splice(0))done() } }) }
+      const second = url.pathname.endsWith('.webp')
+      const image = mockImages[imageVariants[second ? 1 : 0]]
       return imageError
         ? route.fulfill({ status: 403, body: '' })
-        : route.fulfill({ status: 200, contentType: image.mime, body: Buffer.from(image.bytes, 'base64') })
+        : route.fulfill({ status: 200, contentType: second ? 'image/webp' : 'image/png', body: Buffer.from(second ? image.webp : image.png, 'base64') })
     }
     if (url.pathname.startsWith('/storage/v1/object/upload/sign/post-media/')) {
       assert.equal(req.method(), 'PUT')
@@ -170,7 +175,7 @@ try {
       calls.push(input.action)
       if (input.action === 'getMe') {
         body = envelope({ nickname: 'OUer offline', emailMasked: '***@ou.edu.vn', isAdmin: false })
-      } else if (input.action === 'listPosts') body = envelope({ items: [dto()], nextCursor: null })
+      } else if (input.action === 'listPosts') body = envelope({ items: longFeed ? [dto(), ...Array.from({length:14},(_,n)=>({...dto(n+3),images:[]})), dto(2)] : [dto()], nextCursor: null })
       else if (input.action === 'getPost') {
         reads++
         if (holdRead) { readHeld = true; await new Promise(resolve => { releaseRead = resolve }) }
@@ -233,10 +238,17 @@ try {
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Offline-Password-Only-123')
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click()
   await page.waitForURL(origin + '/bang-tin')
+  const track = page.locator('.post-gallery-track').first()
+  const waitImages = async () => page.waitForFunction(count => {
+    const images = [...document.querySelectorAll('.post-images img')]
+    return images.length === count && images.every(image => image.naturalWidth > 0)
+  }, mediaCount)
+  const toEnd = async () => { await waitImages(); await track.focus(); await page.keyboard.press('End') }
+  const atEnd = () => track.evaluate(e => Math.abs(e.scrollWidth - e.clientWidth - e.scrollLeft) <= 1)
   {
     mediaCount = 2
     await page.goto(`${origin}/bai-viet/${id(1)}`)
-    await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+    await toEnd()
     await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
     const start = { reads, imageReads, calls: calls.length }
     const other = await context.newPage()
@@ -245,7 +257,7 @@ try {
     await page.bringToFront()
     await other.close()
     await page.evaluate(() => {
-      window.__mediaNode = document.querySelector('.post-image-frame img')
+      window.__mediaNode = document.querySelector('.post-image-frame img'); window.__mediaLeft = document.querySelector('.post-gallery-track').scrollLeft
       window.__loadingSeen = false
       window.__mediaObserver = new MutationObserver(() => {
         if (document.querySelector('.image-placeholder')) window.__loadingSeen = true
@@ -261,15 +273,15 @@ try {
     })
     await page.waitForTimeout(1000)
     assert.equal(reads, start.reads); assert.equal(imageReads, start.imageReads); assert.equal(calls.length, start.calls)
-    assert.deepEqual(await page.evaluate(() => ({ sameImageNode: window.__mediaNode === document.querySelector('.post-image-frame img'), loadingSeen: window.__loadingSeen, slide: document.querySelector('.carousel-counter')?.textContent })), { sameImageNode: true, loadingSeen: false, slide: '2/2' })
-    console.log(`PASS: FOCUS_UNDER_TTL; getPost=0; allSocialApi=0; imageRequests=0; sameNode=true; loading=false; slide=2/2; nativeBackgroundVisibility=${hidden}; visibility test simulated.`)
+    assert.deepEqual(await page.evaluate(() => ({ sameImageNode: window.__mediaNode === document.querySelector('.post-image-frame img'), loadingSeen: window.__loadingSeen, scrollRetained: Math.abs(window.__mediaLeft - document.querySelector('.post-gallery-track').scrollLeft) < 1 })), { sameImageNode: true, loadingSeen: false, scrollRetained: true })
+    console.log(`PASS: FOCUS_UNDER_TTL; getPost=0; allSocialApi=0; imageRequests=0; sameNode=true; loading=false; scrollRetained=true; nativeBackgroundVisibility=${hidden}; visibility test simulated.`)
     shortExpiry = true
     await page.goto(`${origin}/bai-viet/${id(1)}`)
-    await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+    await toEnd()
     await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
     const expiryStart = reads
     await page.evaluate(() => {
-      window.__mediaNode = document.querySelector('.post-image-frame img')
+      window.__mediaNode = document.querySelector('.post-image-frame img'); window.__mediaLeft = document.querySelector('.post-gallery-track').scrollLeft
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
       document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
     })
@@ -294,14 +306,14 @@ try {
     holdImage = false; releaseImage()
     await page.waitForTimeout(700)
     assert.equal(reads, expiryStart + 1)
-    assert.equal(await page.locator('.carousel-counter').innerText(), '2/2')
+    assert.equal(await atEnd(), true)
     assert.equal(await page.evaluate(() => window.__mediaNode === document.querySelector('.post-image-frame img')), true)
     await series('focus-expired-refreshed')
-    console.log('PASS: FOCUS_AFTER_TTL; hiddenGetPost=0; foregroundGetPost=1; overlapFocus=5; sameNode=true; loading=false; slide=2/2.')
+    console.log('PASS: FOCUS_AFTER_TTL; hiddenGetPost=0; foregroundGetPost=1; overlapFocus=5; sameNode=true; loading=false; scrollRetained=true.')
     // Refetch Detail đang pending và expiry phải dùng chung một request, giữ optimistic vote.
     recoverExpiry = false; shortExpiry = true; voted = false
     await page.reload()
-    await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+    await toEnd()
     await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
     holdRead = true; readHeld = false; recoverExpiry = true
     const overlapStart = reads
@@ -314,12 +326,12 @@ try {
     holdRead = false; releaseRead()
     await page.waitForTimeout(750)
     assert.equal(reads, overlapStart + 1)
-    assert.equal(await page.locator('.carousel-counter').innerText(), '2/2')
+    assert.equal(await atEnd(), true)
     assert.equal(await page.locator('.image-placeholder').count(), 0)
-    await page.getByRole('button', { name: 'Ảnh trước', exact: true }).click()
+    await track.focus(); await page.keyboard.press('Home')
     await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
     assert.equal(reads, overlapStart + 1, 'URL mới cho cả hai ảnh, không xin riêng từng slide')
-    console.log('PASS: DETAIL_QUERY_EXPIRY_OVERLAP; getPost=1; bothImagesReady=true; optimisticVoteRetained=true; slideRetained=true.')
+    console.log('PASS: DETAIL_QUERY_EXPIRY_OVERLAP; getPost=1; bothImagesReady=true; optimisticVoteRetained=true; scrollRetained=true.')
     recoverExpiry = false; voted = false
   }
   mediaCount = 0
@@ -329,7 +341,7 @@ try {
   await series('feed-no-images')
   mediaCount = 1
   await page.reload()
-  await page.locator('.post-image-frame img').waitFor()
+  await page.locator('.post-image-frame img').first().waitFor()
   assert.equal(await page.locator('.carousel-counter,.carousel-control').count(), 0)
   await series('feed-one-image')
   await page.getByRole('link', { name: 'Mở ảnh 1 và chi tiết bài viết', exact: true }).click()
@@ -337,9 +349,9 @@ try {
   await series('detail-one-image')
   mediaCount = 2
   await page.goto(origin + '/bang-tin')
-  await page.locator('.post-image-frame img').waitFor()
-  assert.equal(await page.locator('.post-image-frame img').count(), 1)
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
+  await page.locator('.post-image-frame img').first().waitFor()
+  await waitImages(); assert.equal(await page.locator('.post-image-frame img').count(), 2)
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
   assert.equal(await page.locator('.post-card a a,.post-card a button').count(), 0)
   assert.ok(await page.locator('.post-content-column').evaluate(column => {
     const nodes = ['.post-header', '.post-body', '.post-images', '.post-stats', '.post-meta'].map(selector => column.querySelector(selector))
@@ -347,35 +359,43 @@ try {
   }))
   assert.equal(await page.getByRole('button', { name: 'Tải lại ảnh', exact: true }).count(), 0)
   await series('feed-two-images')
-  await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
-  assert.equal(await page.locator('.carousel-counter').innerText(), '2/2')
+  await toEnd()
+  assert.equal(await atEnd(), true)
   assert.equal(new URL(page.url()).pathname, '/bang-tin', 'Gallery controls không mở Detail')
   await series('feed-second-image')
-  assert.ok(await page.locator('.post-image-frame img').evaluate(img => getComputedStyle(img).objectFit === 'contain'))
-  await page.getByRole('button', { name: 'Ảnh trước', exact: true }).click()
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
-  const gallery = page.getByRole('region', { name: 'Ảnh đính kèm bài viết', exact: true })
+  assert.ok(await page.locator('.post-image-frame img').first().evaluate(img => getComputedStyle(img).objectFit === 'contain'))
+  await track.focus(); await page.keyboard.press('Home')
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
+  const gallery = track
   await gallery.focus()
   await page.keyboard.press('ArrowRight')
-  assert.equal(await page.locator('.carousel-counter').innerText(), '2/2')
+  assert.equal(await atEnd(), true)
   await page.keyboard.press('Home')
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
   await page.keyboard.press('End')
   await page.keyboard.press('ArrowLeft')
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
-  await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).focus()
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
+  await page.getByRole('link', { name: 'Mở ảnh 1 và chi tiết bài viết', exact: true }).focus()
   await page.keyboard.press('ArrowRight')
   assert.equal(await gallery.evaluate(node => document.activeElement === node), true)
   await page.keyboard.press('ArrowLeft')
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
   assert.equal(await gallery.evaluate(node => getComputedStyle(node).animationName), 'none')
+  await page.setViewportSize({width:1280,height:900});await gallery.scrollIntoViewIfNeeded();await gallery.focus();await page.keyboard.press('Home')
+  const rect=await gallery.boundingBox(), x=rect.x+rect.width*.7, y=rect.y+rect.height*.5
+  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x-130,y,{steps:12});await page.mouse.up()
+  assert.ok(await gallery.evaluate(e=>e.scrollLeft)>0,'Mouse drag cuộn native container')
+  assert.equal(new URL(page.url()).pathname,'/bang-tin','Drag không mở Detail')
+  await gallery.focus();await page.keyboard.press('Home');await gallery.hover();await page.mouse.wheel(180,0)
+  await page.waitForFunction(()=>document.querySelector('.post-gallery-track').scrollLeft>0)
+  await gallery.focus();await page.keyboard.press('Home')
   await page.setViewportSize({ width: 390, height: 600 })
-  await page.locator('.post-carousel-viewport').scrollIntoViewIfNeeded()
+  await page.locator('.post-gallery-track').scrollIntoViewIfNeeded()
   const cdp = await context.newCDPSession(page)
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
   const swipe = async (horizontal, direction = -1) => {
-    await page.locator('.post-carousel-viewport').scrollIntoViewIfNeeded()
-    const rect = await page.locator('.post-carousel-viewport').boundingBox()
+    await page.locator('.post-gallery-track').scrollIntoViewIfNeeded()
+    const rect = await page.locator('.post-gallery-track').boundingBox()
     const x = rect.x + rect.width * .75, y = Math.max(80, rect.y + Math.min(rect.height / 2, 200))
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
     for (let step = 1; step <= 6; step++) {
@@ -384,15 +404,15 @@ try {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   }
   await swipe(true)
-  await page.waitForFunction(() => document.querySelector('.carousel-counter')?.textContent === '2/2')
+  await page.waitForFunction(() => document.querySelector('.post-gallery-track').scrollLeft > 0)
   assert.equal(new URL(page.url()).pathname, '/bang-tin', 'Swipe không mở Detail')
   await swipe(true, 1)
-  await page.waitForFunction(() => document.querySelector('.carousel-counter')?.textContent === '1/2')
+  await page.waitForFunction(() => document.querySelector('.post-gallery-track').scrollLeft < 1)
   const beforeScroll = await page.evaluate(() => scrollY)
   await swipe(false)
   await page.waitForTimeout(100)
   assert.ok(await page.evaluate(before => scrollY > before, beforeScroll), 'Cuộn dọc trên ảnh vẫn hoạt động')
-  assert.equal(await page.locator('.carousel-counter').innerText(), '1/2')
+  assert.equal(await track.evaluate(e=>e.scrollLeft), 0)
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false })
   await cdp.detach()
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text } } }))
@@ -407,8 +427,49 @@ try {
   await page.locator('.toast.show').waitFor({ state: 'hidden' })
   assert.equal(await page.locator('.post-thread .post-image-link').count(), 0, 'Detail không self-link')
   await series('detail-two-images')
-  await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+  await toEnd()
   await series('detail-second-image')
+
+  // Tỷ lệ thật, frame ôm ảnh và không upscale; không cần đổi ảnh để tải slot2.
+  for(const variants of [[0,1],[2,3],[4,5],[3]]){
+    imageVariants=variants.length===1?[variants[0],1]:variants;mediaCount=variants.length
+    for(const screen of ['feed','detail'])for(const width of [390,1280])for(const theme of ['light','dark']){
+      await page.setViewportSize({width,height:900})
+      await page.goto(screen==='feed'?origin+'/bang-tin':`${origin}/bai-viet/${id(1)}`)
+      await waitImages()
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme)
+      const geometry=await page.locator('.post-images').evaluate(root=>{
+        const track=root.querySelector('.post-gallery-track'),area=track.getBoundingClientRect()
+        return {trackWidth:area.width,gap:getComputedStyle(track).gap,scrollbar:getComputedStyle(track).scrollbarWidth,images:[...root.querySelectorAll('img')].map(img=>{
+          const r=img.getBoundingClientRect(),f=img.parentElement.getBoundingClientRect()
+          return {naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,width:r.width,height:r.height,frameWidth:f.width,frameHeight:f.height,radius:getComputedStyle(img.parentElement).borderRadius}
+        })}
+      })
+      assert.equal(geometry.gap,'8px');assert.equal(geometry.scrollbar,'none')
+      for(const image of geometry.images){
+        assert.ok(image.width>0&&image.height>0)
+        assert.ok(image.width<=geometry.trackWidth+.1&&image.height<=(width<=720?280:320)+.1)
+        assert.ok(image.width<=image.naturalWidth+.1&&image.height<=image.naturalHeight+.1)
+        assert.ok(Math.abs(image.width/image.height-image.naturalWidth/image.naturalHeight)<.02)
+        assert.ok(Math.abs(image.frameWidth-image.width)<.1&&Math.abs(image.frameHeight-image.height)<.1)
+        assert.equal(image.radius,'12px')
+      }
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+      sizing.push({screen,width,theme,variants,...geometry})
+      await shot(`gallery-${screen}-${variants.join('-')}`,width,theme)
+    }
+  }
+  await writeFile(join(artifacts,'gallery-sizing.json'),JSON.stringify(sizing,null,2))
+  mediaCount=2;imageVariants=[0,1];longFeed=true
+  const beforeLazy=imagePaths.length
+  await page.goto(origin+'/bang-tin')
+  await page.locator('.post-images').nth(0).locator('img').nth(1).waitFor()
+  assert.equal(await page.locator('.post-images').nth(1).locator('img').count(),0)
+  assert.equal(imagePaths.slice(beforeLazy).some(path=>path.includes(`/posts/${id(2)}/`)),false,'Không GET ảnh bài ngoài viewport')
+  await page.locator('.post-images').nth(1).scrollIntoViewIfNeeded()
+  await page.waitForFunction(()=>document.querySelectorAll('.post-images')[1]?.querySelectorAll('img').length===2)
+  assert.equal(imagePaths.slice(beforeLazy).some(path=>path.includes(`/posts/${id(2)}/`)),true)
+  longFeed=false
   await page.goto(origin + '/bang-tin')
   const waitForReads = async target => {
     for (let n = 0; n < 100 && reads < target; n++) await page.waitForTimeout(40)
@@ -418,23 +479,24 @@ try {
   const beforeFailure = reads
   await page.reload()
   await waitForReads(beforeFailure + 3)
-  await page.getByText('Ảnh tạm thời chưa hiển thị.').waitFor()
+  await page.getByText('Ảnh tạm thời chưa hiển thị.').first().waitFor()
   await page.waitForTimeout(800)
   assert.equal(reads, beforeFailure + 3, 'Giới hạn tự refetch, kể cả mỗi lần trả URL mới')
   await series('image-error-placeholder')
-  await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+  await track.focus(); await page.keyboard.press('End')
   await page.waitForTimeout(450)
   assert.equal(reads, beforeFailure + 3, 'Đổi slide không reset ngân sách')
   assert.equal(await page.getByRole('button', { name: /Tải lại ảnh|Đang tải lại|Hãy tải lại trang/ }).count(), 0)
   imageError = false
   await page.reload()
   await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
+  await toEnd()
   imageError = true; recoverImage = true
   const beforeRecovery = reads
-  await page.getByRole('button', { name: 'Ảnh tiếp theo', exact: true }).click()
+  await page.locator('.post-image-frame img').last().evaluate(image=>image.dispatchEvent(new Event('error')))
   await waitForReads(beforeRecovery + 1)
   await page.waitForFunction(() => document.querySelector('.post-image-frame img')?.naturalWidth > 0)
-  assert.equal(await page.locator('.carousel-counter').innerText(), '2/2', 'Refetch URL không đưa carousel về ảnh đầu')
+  assert.equal(await atEnd(), true, 'Refetch URL không đưa carousel về ảnh đầu')
   recoverImage = false
   expired = true
   recoverExpiry = true

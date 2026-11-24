@@ -2,15 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import type { PublicImage } from '../../shared/api/SocialApiClient.ts'
-import { Icon } from '../../shared/components/Icon.tsx'
 import { useAuth } from '../auth/AuthProvider.tsx'
 import { createImageRefresh } from './image-refresh.ts'
 import { readPostImages } from './post-read.ts'
 
 function ImageFrame({ image, revision, number, onFailure }: { image: PublicImage; revision: number; number: number; onFailure(image: PublicImage): void }) {
   const { id, signedUrl, expiresAt } = image
-  const [display, setDisplay] = useState<string | null>(null)
+  const [display, setDisplay] = useState<{ url: string; width: number; height: number } | null>(null)
   const [failed, setFailed] = useState(false)
+  const [broken, setBroken] = useState(false)
   useEffect(() => {
     let current = true
     const probe = new Image()
@@ -21,7 +21,7 @@ function ImageFrame({ image, revision, number, onFailure }: { image: PublicImage
       if (Date.parse(expiresAt) <= Date.now()) { fail(); return }
       probe.onload = async () => {
         try { await probe.decode() } catch { fail(); return }
-        if (current) { setDisplay(signedUrl); setFailed(false) }
+        if (current) { setDisplay({ url: signedUrl, width: probe.naturalWidth, height: probe.naturalHeight }); setFailed(false); setBroken(false) }
       }
       probe.onerror = fail
       probe.src = signedUrl
@@ -31,9 +31,9 @@ function ImageFrame({ image, revision, number, onFailure }: { image: PublicImage
     document.addEventListener('visibilitychange', foreground)
     return () => { current = false; probe.onload = null; probe.onerror = null; document.removeEventListener('visibilitychange', foreground) }
   }, [id, signedUrl, expiresAt, revision, onFailure])
-  return <div className="post-image-frame">
-    {display ? <img src={display} alt={`Ảnh đính kèm ${number}`} decoding="async"
-      referrerPolicy="no-referrer" draggable={false} onError={() => { setDisplay(null); setFailed(true); onFailure(image) }} />
+  return <div className="post-image-frame" style={display ? { width: `min(${display.width}px, calc(var(--post-image-max-height) * ${display.width / display.height}))`, aspectRatio: `${display.width} / ${display.height}` } : undefined}>
+    {display ? <><img src={display.url} width={display.width} height={display.height} alt={`Ảnh đính kèm ${number}`} decoding="async" style={broken ? { visibility: 'hidden' } : undefined}
+      referrerPolicy="no-referrer" draggable={false} onError={() => { setBroken(true); setFailed(true); onFailure({ ...image, signedUrl: display.url }) }} />{broken && <p className="image-failure" role="status">Ảnh tạm thời chưa hiển thị.</p>}</>
       : failed ? <p role="status">Ảnh tạm thời chưa hiển thị.</p>
       : <span className="image-placeholder" role="status">Đang tải ảnh…</span>}
   </div>
@@ -41,27 +41,29 @@ function ImageFrame({ image, revision, number, onFailure }: { image: PublicImage
 
 export function PostImages({ postId, images, detailLink = false }: { postId: string; images: PublicImage[]; detailLink?: boolean }) {
   const { scope } = useAuth()
-  return images.length ? <MediaCarousel key={`${scope}:${postId}:${images.map(image => image.id).join()}`} postId={postId} images={images} detailLink={detailLink} /> : null
+  return images.length ? <MediaGallery key={`${scope}:${postId}:${images.map(image => image.id).join()}`} postId={postId} images={images} detailLink={detailLink} /> : null
 }
 
-function MediaCarousel({ postId, images, detailLink }: { postId: string; images: PublicImage[]; detailLink: boolean }) {
+function MediaGallery({ postId, images, detailLink }: { postId: string; images: PublicImage[]; detailLink: boolean }) {
   const { api, controller, scope } = useAuth()
   const cache = useQueryClient()
-  const [index, setIndex] = useState(0)
+  const [active, setActive] = useState(false)
+  const gallery = useRef<HTMLDivElement>(null)
+  const inViewport = useRef(false)
   const [fresh, setFresh] = useState<{ source: PublicImage[]; images: PublicImage[]; revision: number } | null>(null)
   const failedImage = useRef<PublicImage | null>(null)
   const source = useRef(images)
   const latest = useRef(images)
   const refresh = useRef<ReturnType<typeof createImageRefresh> | null>(null)
-  const pointer = useRef<{ x: number; y: number } | null>(null)
-  const swiped = useRef(false)
+  const pointer = useRef<{ id: number; x: number; y: number; left: number; mouse: boolean; dragged: boolean } | null>(null)
+  const dragged = useRef(false)
   const onFailure = useCallback((image: PublicImage) => { failedImage.current = image; void refresh.current?.refresh() }, [])
   useEffect(() => { source.current = images }, [images])
   useEffect(() => {
     const retry = createImageRefresh({
       load: () => readPostImages(cache, api, scope, postId),
       isCurrent: () => controller.getScope() === scope,
-      isVisible: () => document.visibilityState !== 'hidden',
+      isVisible: () => document.visibilityState !== 'hidden' && inViewport.current,
       isNeeded: () => latest.current.some(image => Date.parse(image.expiresAt) <= Date.now() ||
         (image.id === failedImage.current?.id && image.signedUrl === failedImage.current.signedUrl)),
       generation: () => source.current,
@@ -71,9 +73,20 @@ function MediaCarousel({ postId, images, detailLink }: { postId: string; images:
     refresh.current = retry
     return () => { refresh.current = null; retry.dispose() }
   }, [api, controller, scope, postId, cache])
+  useEffect(() => {
+    const element = gallery.current
+    if (!element) return
+    const observer = new IntersectionObserver(([entry]) => {
+      inViewport.current = entry.isIntersecting
+      if (entry.isIntersecting) { setActive(true); void refresh.current?.refresh() }
+    }, { rootMargin: '200px 0px' })
+    observer.observe(element)
+    return () => { observer.disconnect(); inViewport.current = false }
+  }, [])
   const shown = fresh?.source === images ? fresh.images : images
   useEffect(() => { latest.current = shown }, [shown])
   useEffect(() => {
+    if (!active || !shown.length) return
     const expires = Math.min(...shown.map(image => Date.parse(image.expiresAt)))
     const check = () => {
       if (document.visibilityState !== 'hidden' && (expires <= Date.now() ||
@@ -84,47 +97,50 @@ function MediaCarousel({ postId, images, detailLink }: { postId: string; images:
     window.addEventListener('focus', check)
     check()
     return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check) }
-  }, [shown, fresh?.revision])
+  }, [shown, fresh?.revision, active])
   if (!shown.length) return null
-  const selected = Math.min(index, shown.length - 1), multiple = shown.length > 1
-  const move = (next: number) => setIndex(Math.max(0, Math.min(shown.length - 1, next)))
-  const frame = <ImageFrame key={shown[selected].id} image={shown[selected]} revision={fresh?.revision ?? 0} number={selected + 1} onFailure={onFailure} />
-  return <div className="post-images" role={multiple ? 'region' : 'group'} aria-label="Ảnh đính kèm bài viết"
-    aria-roledescription={multiple ? 'băng chuyền ảnh' : undefined} tabIndex={multiple ? 0 : undefined}
+  const multiple = shown.length > 1
+  return <div ref={gallery} className="post-images" role={multiple ? 'region' : 'group'} aria-label="Ảnh đính kèm bài viết">
+    <div className="post-gallery-track" role={multiple ? 'group' : undefined} tabIndex={multiple ? 0 : undefined} aria-label={multiple ? 'Cuộn ảnh bằng phím mũi tên trái, phải, Home hoặc End' : undefined} data-multiple={multiple}
     onKeyDown={event => {
+      dragged.current = false
       if (!multiple || event.altKey || event.ctrlKey || event.metaKey) return
       if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-        event.preventDefault(); event.stopPropagation(); swiped.current = false
-        move(event.key === 'Home' ? 0 : event.key === 'End' ? shown.length - 1 : selected + (event.key === 'ArrowRight' ? 1 : -1))
+        event.preventDefault(); event.stopPropagation()
+        const track = event.currentTarget
+        const left = event.key === 'Home' ? 0 : event.key === 'End' ? track.scrollWidth : track.scrollLeft + track.clientWidth * .85 * (event.key === 'ArrowRight' ? 1 : -1)
+        track.scrollTo({ left, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
         event.currentTarget.focus()
       }
     }}
-    onClickCapture={event => { if (swiped.current) { event.preventDefault(); event.stopPropagation(); swiped.current = false } }}>
-    <div className="post-carousel-viewport"
+    onClickCapture={event => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); dragged.current = false } }}
       onPointerDown={event => {
-        swiped.current = false
-        pointer.current = event.isPrimary && event.pointerType !== 'mouse' && !(event.target as Element).closest('button') ? { x: event.clientX, y: event.clientY } : null
+        if (!event.isPrimary || event.button !== 0) return
+        dragged.current = false
+        pointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, mouse: event.pointerType === 'mouse', dragged: false }
       }}
-      onPointerCancel={() => { pointer.current = null }}
-      onPointerUp={event => {
+      onPointerMove={event => {
         const start = pointer.current
-        pointer.current = null
-        if (!start || !multiple) return
+        if (!start || start.id !== event.pointerId) return
         const dx = event.clientX - start.x, dy = event.clientY - start.y
-        if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.25) {
-          swiped.current = true
-          move(selected + (dx < 0 ? 1 : -1))
+        if (!start.dragged && Math.hypot(dx, dy) > 6) {
+          start.dragged = true; dragged.current = true
+          if (start.mouse) { event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.dataset.dragging = 'true' }
         }
-      }}>
-      {detailLink ? <Link className="post-image-link" to={`/bai-viet/${postId}`} aria-label={`Mở ảnh ${selected + 1} và chi tiết bài viết`} draggable={false}>{frame}</Link> : frame}
-      {multiple && <>
-        <span className="carousel-counter" aria-hidden="true">{selected + 1}/{shown.length}</span>
-        <button type="button" className="carousel-control carousel-previous" aria-label="Ảnh trước" disabled={selected === 0}
-          onClick={event => { event.stopPropagation(); move(selected - 1) }}><Icon name="chevron" /></button>
-        <button type="button" className="carousel-control carousel-next" aria-label="Ảnh tiếp theo" disabled={selected === shown.length - 1}
-          onClick={event => { event.stopPropagation(); move(selected + 1) }}><Icon name="chevron" /></button>
-      </>}
+        if (start.mouse && start.dragged) { event.preventDefault(); event.currentTarget.scrollLeft = start.left - dx }
+      }}
+      onPointerUp={event => {
+        pointer.current = null
+        delete event.currentTarget.dataset.dragging
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+      }}
+      onPointerCancel={event => { pointer.current = null; dragged.current = true; delete event.currentTarget.dataset.dragging }}
+      onLostPointerCapture={event => { pointer.current = null; delete event.currentTarget.dataset.dragging }}
+      onPointerLeave={() => { if (pointer.current?.mouse && !pointer.current.dragged) pointer.current = null }}>
+      {active ? shown.map((image, index) => {
+        const frame = <ImageFrame image={image} revision={fresh?.revision ?? 0} number={index + 1} onFailure={onFailure} />
+        return detailLink ? <Link key={image.id} className="post-gallery-item post-image-link" to={`/bai-viet/${postId}`} aria-label={`Mở ảnh ${index + 1} và chi tiết bài viết`} draggable={false}>{frame}</Link> : <div key={image.id} className="post-gallery-item">{frame}</div>
+      }) : <span className="image-placeholder" role="status">Ảnh đính kèm sẽ tải khi bạn cuộn đến.</span>}
     </div>
-    {multiple && <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">Ảnh {selected + 1} trên {shown.length}</span>}
   </div>
 }
